@@ -14,4 +14,41 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "knot/common/log.h"
+#include "knot/conf/conf.h"
 #include "knot/modules/geoip.h"
+
+const yp_item_t scheme_mod_geoip[] = {
+	{ C_ID,       YP_TSTR, YP_VNONE },
+	{ C_GEOIP_DB, YP_TSTR, YP_VNONE },
+	{ C_COMMENT,  YP_TSTR, YP_VNONE },
+	{ NULL }
+};
+
+int geoip_check(conf_check_t *args)
+{
+	log_debug("%s", __func__);
+	conf_val_t database = conf_rawid_get_txn(args->conf, args->txn,
+	                                         C_MOD_GEOIP, C_GEOIP_DB,
+	                                         args->previous->id,
+	                                         args->previous->id_len);
+
+	if (database.code != KNOT_EOK) {
+		*args->err_str = "no database specified";
+		return KNOT_EINVAL;
+	}
+
+	return KNOT_EOK;
+}
+
+int geoip_load(struct query_plan *plan, struct query_module *self)
+{
+	log_debug("%s", __func__);
+	return KNOT_EOK;
+}
+
+int geoip_unload(struct query_module *self)
+{
+	log_debug("%s", __func__);
+	return KNOT_EOK;
+}

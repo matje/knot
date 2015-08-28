@@ -29,6 +29,9 @@
 #if USE_DNSTAP
 #include "knot/modules/dnstap.h"
 #endif
+#if HAVE_GEOIP
+#include "knot/modules/geoip.h"
+#endif
 
 typedef struct static_module {
 	const yp_name_t *name;
@@ -47,6 +50,9 @@ static_module_t MODULES[] = {
 #endif
 #if USE_DNSTAP
         { C_MOD_DNSTAP,       &dnstap_load,       &dnstap_unload,       MOD_SCOPE_ANY },
+#endif
+#if HAVE_GEOIP
+        { C_MOD_GEOIP,        &geoip_load,        &geoip_unload,        MOD_SCOPE_ANY },
 #endif
         { NULL }
 };

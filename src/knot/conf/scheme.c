@@ -37,6 +37,9 @@
 #if USE_DNSTAP
 #include "knot/modules/dnstap.h"
 #endif
+#if HAVE_GEOIP
+#include "knot/modules/geoip.h"
+#endif
 
 #define HOURS(x)	((x) * 3600)
 #define DAYS(x)		((x) * HOURS(24))
@@ -260,6 +263,10 @@ const yp_item_t conf_scheme[] = {
 	                                         { check_mod_dnstap } },
 #endif
 	{ C_MOD_ONLINE_SIGN,  YP_TGRP, YP_VGRP = { scheme_mod_online_sign }, YP_FMULTI },
+#if HAVE_GEOIP
+	{ C_MOD_GEOIP,        YP_TGRP, YP_VGRP = { scheme_mod_geoip }, YP_FMULTI,
+	                                         { geoip_check } },
+#endif
 /***********/
 	{ C_TPL,      YP_TGRP, YP_VGRP = { desc_template }, YP_FMULTI, { check_template } },
 	{ C_ZONE,     YP_TGRP, YP_VGRP = { desc_zone }, YP_FMULTI, { check_zone } },

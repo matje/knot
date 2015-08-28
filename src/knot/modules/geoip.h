@@ -15,3 +15,15 @@
 */
 
 #pragma once
+
+#include "knot/nameserver/query_module.h"
+
+/*! \brief Module scheme. */
+#define C_MOD_GEOIP "\x9""mod-geoip"
+#define C_GEOIP_DB  "\x8""database"
+extern const yp_item_t scheme_mod_geoip[];
+
+/*! \brief Module interface. */
+int geoip_check(conf_check_t *args);
+int geoip_load(struct query_plan *plan, struct query_module *self);
+int geoip_unload(struct query_module *self);
