@@ -20,7 +20,8 @@
 
 /*! \brief Module scheme. */
 #define C_MOD_GEOIP "\x9""mod-geoip"
-#define C_GEOIP_DB  "\x8""database"
+#define C_GEOIP_DB4  "\x9""database4"
+#define C_GEOIP_DB6  "\x9""database6"
 extern const yp_item_t scheme_mod_geoip[];
 
 /*! \brief Module interface. */
