@@ -403,8 +403,8 @@ AC_ARG_ENABLE([geoip],
 
 AS_IF([test "$enable_geoip" != "no"],[
   AS_CASE([$enable_geoip],
-    [auto],[PKG_CHECK_MODULES([geoip], [geoip], [enable_geoip=yes], [enable_geoip=no])],
-    [yes], [PKG_CHECK_MODULES([geoip], [geoip])],
+    [auto],[PKG_CHECK_MODULES([libmaxminddb], [libmaxminddb], [enable_geoip=yes], [enable_geoip=no])],
+    [yes], [PKG_CHECK_MODULES([libmaxminddb], [libmaxminddb])],
     [*],[AC_MSG_ERROR([Invalid value of --enable-geoip.])])
     ])
 
@@ -569,7 +569,7 @@ AC_MSG_RESULT([
     Jansson:  ${jansson_LIBS} ${jansson_CFLAGS}
     Libedit:  ${libedit_LIBS} ${libedit_CFLAGS}
     LMDB:     ${enable_lmdb} ${lmdb_LIBS} ${lmdb_CFLAGS}
-    GeoIP:    ${enable_geoip} ${geoip_LIBS} ${geoip_CFLAGS}
+    GeoIP:    ${enable_geoip} ${libmaxminddb_LIBS} ${libmaxminddb_CFLAGS}
 
     Sanitizer: ${sanitize_CFLAGS}
     LibFuzzer: ${libfuzzer_LIBS}
