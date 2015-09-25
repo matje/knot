@@ -705,7 +705,7 @@ int knot_edns_client_set_address(knot_edns_client_subnet_t *ecs,
 
 	wire_ctx_t dst = wire_ctx_init(ecs->address, sizeof(ecs->address));
 	wire_ctx_t src = wire_ctx_init_const((void *)addr + f->offset, f->size);
-	ecs_write_address(&dst, &src, f->size);
+	ecs_write_address(&dst, &src, ecs->source_len);
 
 	assert(dst.error == KNOT_EOK);
 
