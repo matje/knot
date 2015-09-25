@@ -687,8 +687,8 @@ int knot_edns_client_subnet_parse(knot_edns_client_subnet_t *ecs,
 }
 
 _public_
-int knot_edns_client_set_address(knot_edns_client_subnet_t *ecs,
-                                 const struct sockaddr_storage *addr)
+int knot_edns_client_subnet_set_addr(knot_edns_client_subnet_t *ecs,
+                                     const struct sockaddr_storage *addr)
 {
 	if (ecs == NULL || addr == NULL) {
 		return KNOT_EINVAL;
@@ -713,8 +713,8 @@ int knot_edns_client_set_address(knot_edns_client_subnet_t *ecs,
 }
 
 _public_
-int knot_edns_client_get_address(struct sockaddr_storage *addr,
-                                 const struct knot_edns_client_subnet *ecs)
+int knot_edns_client_subnet_get_addr(struct sockaddr_storage *addr,
+                                     const knot_edns_client_subnet_t *ecs)
 {
 	if (addr == NULL || ecs == NULL) {
 		return KNOT_EINVAL;

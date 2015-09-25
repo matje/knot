@@ -171,10 +171,10 @@ static void test_set_address(void)
 	knot_edns_client_subnet_t ecs = { 0 };
 	struct sockaddr_storage ss = { 0 };
 
-	r = knot_edns_client_set_address(NULL, &ss);
+	r = knot_edns_client_subnet_set_addr(NULL, &ss);
 	is_int(KNOT_EINVAL, r, "%s: missing ECS", __func__);
 
-	r = knot_edns_client_set_address(&ecs, NULL);
+	r = knot_edns_client_subnet_set_addr(&ecs, NULL);
 	is_int(KNOT_EINVAL, r, "%s: missing address", __func__);
 
 	memset(&ecs, GARBAGE_BYTE, sizeof(ecs));
@@ -182,7 +182,7 @@ static void test_set_address(void)
 	assert(ss.ss_family == AF_INET);
 	const uint8_t raw4[4] = { 198, 51, 100, 42 };
 
-	r = knot_edns_client_set_address(&ecs, &ss);
+	r = knot_edns_client_subnet_set_addr(&ecs, &ss);
 	ok(r == KNOT_EOK &&
 	   ecs.family == 1 && ecs.source_len == 32 && ecs.scope_len == 0 &&
 	   memcmp(ecs.address, raw4, sizeof(raw4)) == 0,
@@ -193,14 +193,14 @@ static void test_set_address(void)
 	assert(ss.ss_family == AF_INET6);
 	const uint8_t raw6[16] = "\x20\x01\x0d\xb8\x00\x00\x00\x00"
 	                         "\x00\x00\x00\x00\xde\xad\xbe\xef";
-	r = knot_edns_client_set_address(&ecs, &ss);
+	r = knot_edns_client_subnet_set_addr(&ecs, &ss);
 	ok(r == KNOT_EOK &&
 	   ecs.family == 2 && ecs.source_len == 128 && ecs.scope_len == 0 &&
 	   memcmp(ecs.address, raw6, sizeof(raw6)) == 0,
 	   "%s: IPv6", __func__);
 
 	const struct sockaddr_storage ss_unix = { .ss_family = AF_UNIX };
-	r = knot_edns_client_set_address(&ecs, &ss_unix);
+	r = knot_edns_client_subnet_set_addr(&ecs, &ss_unix);
 	is_int(KNOT_ENOTSUP, r, "%s: UNIX not supported", __func__);
 }
 
@@ -235,7 +235,7 @@ static void test_get_address(void)
 
 	for (struct test const *t = TESTS; t->msg != NULL; t++) {
 		struct sockaddr_storage result = { 0 };
-		int r = knot_edns_client_get_address(&result, &t->ecs);
+		int r = knot_edns_client_subnet_get_addr(&result, &t->ecs);
 		bool valid = false;
 
 		if (t->expected == KNOT_EOK) {

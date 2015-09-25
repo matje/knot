@@ -421,8 +421,8 @@ int knot_edns_client_subnet_parse(knot_edns_client_subnet_t *ecs,
  *
  * \return Error code. KNOT_EOK if succesful.
  */
-int knot_edns_client_set_address(knot_edns_client_subnet_t *ecs,
-                                 const struct sockaddr_storage *addr);
+int knot_edns_client_subnet_set_addr(knot_edns_client_subnet_t *ecs,
+                                     const struct sockaddr_storage *addr);
 
 /*!
  * \brief Get address from the ECS structure.
@@ -433,7 +433,7 @@ int knot_edns_client_set_address(knot_edns_client_subnet_t *ecs,
  * \param addr  Address to be set.
  * \param ecs   ECS structure to retrieve address from.
  */
-int knot_edns_client_get_address(struct sockaddr_storage *addr,
-                                 const knot_edns_client_subnet_t *ecs);
+int knot_edns_client_subnet_get_addr(struct sockaddr_storage *addr,
+                                     const knot_edns_client_subnet_t *ecs);
 
 /*! @} */
