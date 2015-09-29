@@ -261,19 +261,33 @@ int knot_edns_reserve_option(knot_rrset_t *opt_rr, uint16_t code,
                              uint16_t size, uint8_t **wire_ptr, knot_mm_t *mm);
 
 /*!
- * \brief Adds EDNS Option to the OPT RR.
+ * \brief Get EDNS option content in the wire.
  *
- * \note The function now supports adding empty OPTION (just having its code).
- *       This does not make much sense now with NSID, but may be ok use later.
+ * \param[in]  opt_rr    OPT RR in the packet.
+ * \param[in]  code      Option code.
+ * \param[out] wire_ptr  Option data (can be NULL).
+ * \param[out] size      Option size (can be NULL).
  *
- * \param opt_rr  OPT RR structure to add the Option to.
- * \param code    Option code.
- * \param size    Option data length in bytes.
- * \param data    Option data.
- * \param mm      Memory context.
+ * \return Error code, KNOT_EOK if sucessful.
+ * \retval KNOT_EOK     Option found.
+ * \retval KNOT_ENOENT  Option not found.
+ */
+int knot_edns_get_option(const knot_rrset_t *opt_rr, uint16_t code,
+                         uint8_t **wire_ptr, uint16_t *size);
+
+/*!
+ * \brief Add EDNS option into the packet.
  *
- * \retval KNOT_EOK
- * \retval KNOT_ENOMEM
+ * Similar to \a knot_edns_reserve_option, however the option content is set
+ * immediately.
+ *
+ * \param[in] opt_rr  OPT RR in the packet.
+ * \param[in] code    Option code.
+ * \param[in] size    Option length.
+ * \param[in] data    Option data.
+ * \param[in] mm      Memory context.
+ *
+ * \return Error code, KNOT_EOF if successful.
  */
 int knot_edns_add_option(knot_rrset_t *opt_rr, uint16_t code,
                          uint16_t size, const uint8_t *data, knot_mm_t *mm);
@@ -288,17 +302,6 @@ int knot_edns_add_option(knot_rrset_t *opt_rr, uint16_t code,
  * \retval 0 otherwise.
  */
 bool knot_edns_has_option(const knot_rrset_t *opt_rr, uint16_t code);
-
-/*!
- * \brief Searches the OPT RR for option with the specified code.
- *
- * \param opt_rr  OPT RR structure to search for the Option in.
- * \param code    Option code to search for.
- *
- * \retval pointer to option if found
- * \retval NULL otherwise.
- */
-uint8_t *knot_edns_get_option(const knot_rrset_t *opt_rr, uint16_t code);
 
 /*!
  * \brief Returns the option code.
