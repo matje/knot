@@ -528,7 +528,7 @@ typedef struct ecs_family ecs_family_t;
  *
  * http://www.iana.org/assignments/address-family-numbers/address-family-numbers.xml
  */
-const ecs_family_t ECS_FAMILIES[] = {
+static const ecs_family_t ECS_FAMILIES[] = {
 	ECS_INIT(AF_INET,  1, struct sockaddr_in,  sin_addr),
 	ECS_INIT(AF_INET6, 2, struct sockaddr_in6, sin6_addr),
 	{ 0 }

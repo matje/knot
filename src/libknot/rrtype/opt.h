@@ -393,22 +393,37 @@ struct knot_edns_client_subnet {
 };
 
 typedef struct knot_edns_client_subnet knot_edns_client_subnet_t;
-
 struct sockaddr_storage;
 
 /*!
- * \brief Get size of the EDNS Client Subnet option size.
+ * \brief Get size of the EDNS Client Subnet option wire size.
+ *
+ * \param ecs  EDNS Client Subnet data.
+ *
+ * \return Size of the EDNS option data.
  */
 size_t knot_edns_client_subnet_size(const knot_edns_client_subnet_t *ecs);
 
-/**
- * \brief Creates client subnet wire data.
+/*!
+ * \brief Write EDNS Client Subnet data from the ECS structure to wire.
+ *
+ * \param option      EDNS option data buffer.
+ * \param option_len  EDNS option data buffer size.
+ * \param ecs         EDNS Client Subnet data.
+ *
+ * \return Error code, KNOT_EOK if sucessful.
  */
 int knot_edns_client_subnet_write(uint8_t *option, size_t option_len,
                                   const knot_edns_client_subnet_t *ecs);
 
 /*!
- * \brief Parses client subnet wire data.
+ * \brief Parse EDNS Client Subnet data from wire to the ECS structure.
+ *
+ * \param[out] ecs         EDNS Client Subnet data.
+ * \param[in]  option      EDNS option data.
+ * \param[in]  option_len  EDNS option size.
+ *
+ * \return Error code, KNOT_EOK if sucessful.
  */
 int knot_edns_client_subnet_parse(knot_edns_client_subnet_t *ecs,
                                   const uint8_t *option, size_t option_len);
