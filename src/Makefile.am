@@ -481,4 +481,8 @@ rosedb_tool_CFLAGS = $(AM_CFLAGS) $(lmdb_CFLAGS) $(DNSTAP_CFLAGS)
 rosedb_tool_LDFLAGS = $(AM_LDFLAGS) $(lmdb_LIBS)
 endif # HAVE_ROSEDB
 
+bin_PROGRAMS += knot_journalprint
+knot_journalprint_SOURCES = utils/knot-journalprint/knot-journalprint.c
+knot_journalprint_LDADD = libknotd.la
+
 endif # HAVE_UTILS
