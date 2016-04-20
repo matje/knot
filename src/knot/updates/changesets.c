@@ -19,6 +19,7 @@
 #include <stdarg.h>
 
 #include "knot/updates/changesets.h"
+#include "knot/server/serialization.h"
 #include "libknot/libknot.h"
 #include "contrib/macros.h"
 #include "contrib/mempattern.h"
@@ -173,6 +174,21 @@ static void check_redundancy(zone_contents_t *counterpart, const knot_rrset_t *r
 	}
 
 	return;
+}
+
+/*! \brief Serialize RRSet. */
+static int rrset_write_to_mem(const knot_rrset_t *rr, char **entry,
+                              size_t *remaining) {
+	size_t written = 0;
+	int ret = rrset_serialize(rr, *((uint8_t **)entry),
+	                          &written);
+	if (ret == KNOT_EOK) {
+		assert(written <= *remaining);
+		*remaining -= written;
+		*entry += written;
+	}
+
+	return ret;
 }
 
 /* ------------------------------- API -------------------------------------- */
@@ -359,6 +375,126 @@ int changeset_merge(changeset_t *ch1, const changeset_t *ch2)
 	ch1->soa_to = soa_copy;
 
 	return KNOT_EOK;
+}
+
+int changeset_pack_to(const changeset_t *ch, char *entry, size_t max_size)
+{
+	/* Serialize SOA 'from'. */
+	int ret = rrset_write_to_mem(ch->soa_from, &entry, &max_size);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	changeset_iter_t itt;
+	ret = changeset_iter_rem(&itt, ch, false);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	knot_rrset_t rrset = changeset_iter_next(&itt);
+	while (!knot_rrset_empty(&rrset)) {
+		ret = rrset_write_to_mem(&rrset, &entry, &max_size);
+		if (ret != KNOT_EOK) {
+			changeset_iter_clear(&itt);
+			return ret;
+		}
+		rrset = changeset_iter_next(&itt);
+	}
+	changeset_iter_clear(&itt);
+
+	/* Serialize SOA 'to'. */
+	ret = rrset_write_to_mem(ch->soa_to, &entry, &max_size);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	/* Serialize RRSets from the 'add' section. */
+	ret = changeset_iter_add(&itt, ch, false);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	rrset = changeset_iter_next(&itt);
+	while (!knot_rrset_empty(&rrset)) {
+		ret = rrset_write_to_mem(&rrset, &entry, &max_size);
+		if (ret != KNOT_EOK) {
+			changeset_iter_clear(&itt);
+			return ret;
+		}
+		rrset = changeset_iter_next(&itt);
+	}
+	changeset_iter_clear(&itt);
+
+	return KNOT_EOK;
+}
+
+int changeset_unpack_from(changeset_t *chs, void *src, size_t len)
+{
+	assert(chs != NULL);
+
+	/* Read changeset flags. */
+	if (src == NULL) {
+		return KNOT_EMALF;
+	}
+	size_t remaining = len;
+
+	/* Read initial changeset RRSet - SOA. */
+	uint8_t *stream = src + (len - remaining);
+	knot_rrset_t rrset;
+	int ret = rrset_deserialize(stream, &remaining, &rrset);
+	if (ret != KNOT_EOK) {
+		return KNOT_EMALF;
+	}
+
+	assert(rrset.type == KNOT_RRTYPE_SOA);
+	chs->soa_from = knot_rrset_copy(&rrset, NULL);
+	knot_rrset_clear(&rrset, NULL);
+	if (chs->soa_from == NULL) {
+		return KNOT_ENOMEM;
+	}
+
+	/* Read remaining RRSets */
+	bool in_remove_section = true;
+	while (remaining > 0) {
+
+		/* Parse next RRSet. */
+		stream = src + (len - remaining);
+		knot_rrset_init_empty(&rrset);
+		ret = rrset_deserialize(stream, &remaining, &rrset);
+		if (ret != KNOT_EOK) {
+			return KNOT_EMALF;
+		}
+
+		/* Check for next SOA. */
+		if (rrset.type == KNOT_RRTYPE_SOA) {
+			/* Move to ADD section if in REMOVE. */
+			if (in_remove_section) {
+				chs->soa_to = knot_rrset_copy(&rrset, NULL);
+				if (chs->soa_to == NULL) {
+					ret = KNOT_ENOMEM;
+					break;
+				}
+				in_remove_section = false;
+			} else {
+				/* Final SOA, no-op. */
+				;
+			}
+		} else {
+			/* Remove RRSets. */
+			if (in_remove_section) {
+				ret = changeset_rem_rrset(chs, &rrset, 0);
+			} else {
+				/* Add RRSets. */
+				ret = changeset_add_rrset(chs, &rrset, 0);
+			}
+		}
+		knot_rrset_clear(&rrset, NULL);
+		if (ret != KNOT_EOK) {
+			break;
+		}
+	}
+
+	return ret;
 }
 
 void changesets_clear(list_t *chgs)

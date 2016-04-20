@@ -61,7 +61,8 @@ typedef struct zone
 	size_t ddns_queue_size;
 	list_t ddns_queue;
 
-	/*! \brief Journal access lock. */
+	/*! \brief Journal and its access lock. */
+	journal_t *journal;
 	pthread_mutex_t journal_lock;
 
 	/*! \brief Zone events. */
@@ -103,8 +104,10 @@ void zone_free(zone_t **zone_ptr);
  * \ref #223 New zone API
  * \todo get rid of this
  */
-int zone_changes_store(conf_t *conf, zone_t *zone, list_t *chgs);
 int zone_change_store(conf_t *conf, zone_t *zone, changeset_t *change);
+int zone_changes_store(conf_t *conf, zone_t *zone, list_t *chgs);
+int zone_changes_load(conf_t *conf, zone_t *zone, list_t *dst, uint32_t from);
+
 /*!
  * \brief Atomically switch the content of the zone.
  */

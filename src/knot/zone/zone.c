@@ -31,8 +31,6 @@
 #include "contrib/ucw/lists.h"
 #include "contrib/ucw/mempool.h"
 
-#define JOURNAL_SUFFIX	".diff.db"
-
 static void free_ddns_queue(zone_t *z)
 {
 	ptrnode_t *node = NULL, *nxt = NULL;
@@ -40,6 +38,101 @@ static void free_ddns_queue(zone_t *z)
 		knot_request_free(node->d, NULL);
 	}
 	ptrlist_free(&z->ddns_queue, NULL);
+}
+
+/*! \brief Open journal for zone. */
+static void init_journal(conf_t *conf, zone_t *zone)
+{
+	assert(zone);
+	if (zone->journal != NULL) {
+		return; /* Journal is already open */
+	}
+
+	conf_val_t val = conf_zone_get(conf, C_MAX_JOURNAL_SIZE, zone->name);
+	int64_t journal_fslimit = conf_int(&val);
+	char *journal_file = conf_journalfile(conf, zone->name);
+
+	zone->journal = journal_open(journal_file, journal_fslimit);
+	if (zone->journal == NULL) {
+		log_zone_error(zone->name, "failed to open journal '%s'",
+		               journal_file);
+	}
+	free(journal_file);
+}
+
+/*! \brief Close the zone journal. */
+static void deinit_journal(zone_t *zone)
+{
+	assert(zone);
+	if (zone->journal == NULL) {
+		return;
+	}
+
+	journal_close(&zone->journal);
+}
+
+static int flush_journal(conf_t *conf, zone_t *zone)
+{
+	/*! @note Function expects nobody will change zone contents meanwile. */
+
+	assert(zone);
+	if (zone_contents_is_empty(zone->contents)) {
+		return KNOT_EINVAL;
+	}
+
+	/* Check for disabled zonefile synchronization. */
+	conf_val_t val = conf_zone_get(conf, C_ZONEFILE_SYNC, zone->name);
+	if (conf_int(&val) < 0 && (zone->flags & ZONE_FORCE_FLUSH) == 0) {
+		return KNOT_EOK;
+	}
+	zone->flags &= ~ZONE_FORCE_FLUSH;
+
+	/* Check for difference against zonefile serial. */
+	zone_contents_t *contents = zone->contents;
+	uint32_t serial_to = zone_contents_serial(contents);
+	if (zone->zonefile_serial == serial_to) {
+		return KNOT_EOK; /* No differences. */
+	}
+
+	char *zonefile = conf_zonefile(conf, zone->name);
+
+	/* Synchronize journal. */
+	int ret = zonefile_write(zonefile, contents);
+	if (ret == KNOT_EOK) {
+		log_zone_info(zone->name, "zone file updated, serial %u -> %u",
+		              zone->zonefile_serial, serial_to);
+	} else {
+		log_zone_warning(zone->name, "failed to update zone file (%s)",
+		                 knot_strerror(ret));
+		free(zonefile);
+		return ret;
+	}
+
+	/* Update zone version. */
+	struct stat st;
+	if (stat(zonefile, &st) < 0) {
+		log_zone_warning(zone->name, "failed to update zone file (%s)",
+		                 knot_strerror(KNOT_EACCES));
+		free(zonefile);
+		return KNOT_EACCES;
+	}
+
+	free(zonefile);
+
+	/* Update zone file serial and journal. */
+	zone->zonefile_mtime = st.st_mtime;
+	zone->zonefile_serial = serial_to;
+
+	/* Flush journal. */
+	ret = journal_flush(zone->journal);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	/* Trim extra heap. */
+	mem_trim();
+
+	return ret;
 }
 
 zone_t* zone_new(const knot_dname_t *name)
@@ -111,24 +204,20 @@ int zone_change_store(conf_t *conf, zone_t *zone, changeset_t *change)
 		return KNOT_EINVAL;
 	}
 
-	conf_val_t val = conf_zone_get(conf, C_MAX_JOURNAL_SIZE, zone->name);
-	int64_t ixfr_fslimit = conf_int(&val);
-	char *journal_file = conf_journalfile(conf, zone->name);
-
 	pthread_mutex_lock(&zone->journal_lock);
-	int ret = journal_store_changeset(change, journal_file, ixfr_fslimit);
+	init_journal(conf, zone);
+	int ret = journal_store_changeset(zone->journal, change);
 	if (ret == KNOT_EBUSY) {
 		log_zone_notice(zone->name, "journal is full, flushing");
 
 		/* Transaction rolled back, journal released, we may flush. */
-		ret = zone_flush_journal(conf, zone);
+		ret = flush_journal(conf, zone);
 		if (ret == KNOT_EOK) {
-			ret = journal_store_changeset(change, journal_file, ixfr_fslimit);
+			ret = journal_store_changeset(zone->journal, change);
 		}
 	}
+	deinit_journal(zone);
 	pthread_mutex_unlock(&zone->journal_lock);
-
-	free(journal_file);
 
 	return ret;
 }
@@ -139,25 +228,36 @@ int zone_changes_store(conf_t *conf, zone_t *zone, list_t *chgs)
 		return KNOT_EINVAL;
 	}
 
-	conf_val_t val = conf_zone_get(conf, C_MAX_JOURNAL_SIZE, zone->name);
-	int64_t ixfr_fslimit = conf_int(&val);
-	char *journal_file = conf_journalfile(conf, zone->name);
-
 	pthread_mutex_lock(&zone->journal_lock);
-	int ret = journal_store_changesets(chgs, journal_file, ixfr_fslimit);
+	init_journal(conf, zone);
+	int ret = journal_store_changesets(zone->journal, chgs);
 	if (ret == KNOT_EBUSY) {
 		log_zone_notice(zone->name, "journal is full, flushing");
 
 		/* Transaction rolled back, journal released, we may flush. */
-		ret = zone_flush_journal(conf, zone);
+		ret = flush_journal(conf, zone);
 		if (ret == KNOT_EOK) {
-			ret = journal_store_changesets(chgs, journal_file, ixfr_fslimit);
+			ret = journal_store_changesets(zone->journal, chgs);
 		}
 
 	}
+	deinit_journal(zone);
 	pthread_mutex_unlock(&zone->journal_lock);
 
-	free(journal_file);
+	return ret;
+}
+
+int zone_changes_load(conf_t *conf, zone_t *zone, list_t *dst, uint32_t from)
+{
+	if (conf == NULL || zone == NULL || dst == NULL) {
+		return KNOT_EINVAL;
+	}
+
+	pthread_mutex_lock((pthread_mutex_t *)&zone->journal_lock);
+	init_journal(conf, zone);
+	int ret = journal_load_changesets(zone->journal, zone->name, dst, from);
+	deinit_journal(zone);
+	pthread_mutex_unlock((pthread_mutex_t *)&zone->journal_lock);
 
 	return ret;
 }
@@ -297,60 +397,23 @@ int zone_master_try(conf_t *conf, zone_t *zone, zone_master_cb callback,
 
 int zone_flush_journal(conf_t *conf, zone_t *zone)
 {
-	if (conf == NULL || zone == NULL || zone_contents_is_empty(zone->contents)) {
+	if (conf == NULL || zone == NULL) {
 		return KNOT_EINVAL;
 	}
 
-	/* Check for disabled zonefile synchronization. */
-	conf_val_t val = conf_zone_get(conf, C_ZONEFILE_SYNC, zone->name);
-	if (conf_int(&val) < 0 && (zone->flags & ZONE_FORCE_FLUSH) == 0) {
-		return KNOT_EOK;
-	}
-	zone->flags &= ~ZONE_FORCE_FLUSH;
-
-	/* Check for difference against zonefile serial. */
-	zone_contents_t *contents = zone->contents;
-	uint32_t serial_to = zone_contents_serial(contents);
-	if (zone->zonefile_serial == serial_to) {
-		return KNOT_EOK; /* No differences. */
-	}
-
-	char *zonefile = conf_zonefile(conf, zone->name);
-
-	/* Synchronize journal. */
-	int ret = zonefile_write(zonefile, contents);
-	if (ret == KNOT_EOK) {
-		log_zone_info(zone->name, "zone file updated, serial %u -> %u",
-		              zone->zonefile_serial, serial_to);
-	} else {
-		log_zone_warning(zone->name, "failed to update zone file (%s)",
-		                 knot_strerror(ret));
-		free(zonefile);
-		return ret;
-	}
-
-	/* Update zone version. */
-	struct stat st;
-	if (stat(zonefile, &st) < 0) {
-		log_zone_warning(zone->name, "failed to update zone file (%s)",
-		                 knot_strerror(KNOT_EACCES));
-		free(zonefile);
-		return KNOT_EACCES;
-	}
-
-	free(zonefile);
-
 	char *journal_file = conf_journalfile(conf, zone->name);
-
-	/* Update zone file serial and journal. */
-	zone->zonefile_mtime = st.st_mtime;
-	zone->zonefile_serial = serial_to;
-	journal_mark_synced(journal_file);
-
+	bool j_exists = journal_exists(journal_file);
 	free(journal_file);
 
-	/* Trim extra heap. */
-	mem_trim();
+	pthread_mutex_lock(&zone->journal_lock);
+	if (j_exists) {
+		init_journal(conf, zone);
+	}
+	int ret = flush_journal(conf, zone);
+	if (j_exists) {
+		deinit_journal(zone);
+	}
+	pthread_mutex_unlock(&zone->journal_lock);
 
 	return ret;
 }

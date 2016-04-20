@@ -96,11 +96,11 @@ int zone_load_journal(conf_t *conf, zone_t *zone, zone_contents_t *contents)
 
 	/* Check if journal is used and zone is not empty. */
 	char *journal_name = conf_journalfile(conf, zone->name);
-	if (!journal_exists(journal_name) ||
-	    zone_contents_is_empty(contents)) {
+	if (!journal_exists(journal_name) || zone_contents_is_empty(contents)) {
 		free(journal_name);
 		return KNOT_EOK;
 	}
+	free(journal_name);
 
 	/* Fetch SOA serial. */
 	uint32_t serial = zone_contents_serial(contents);
@@ -109,13 +109,8 @@ int zone_load_journal(conf_t *conf, zone_t *zone, zone_contents_t *contents)
 	list_t chgs;
 	init_list(&chgs);
 
-	pthread_mutex_lock(&zone->journal_lock);
-	int ret = journal_load_changesets(journal_name, zone, &chgs, serial,
-	                                  serial - 1);
-	pthread_mutex_unlock(&zone->journal_lock);
-	free(journal_name);
-
-	if ((ret != KNOT_EOK && ret != KNOT_ERANGE) || EMPTY_LIST(chgs)) {
+	int ret = zone_changes_load(conf, zone, &chgs, serial);
+	if (ret != KNOT_EOK) {
 		changesets_free(&chgs);
 		/* Absence of records is not an error. */
 		if (ret == KNOT_ENOENT) {

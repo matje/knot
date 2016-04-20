@@ -102,7 +102,7 @@ class Server(object):
         self.disable_notify = None
         self.tcp_reply_timeout = None
         self.zonefile_sync = None
-        self.journal_size = None
+        self.journal_size = 5 * 1024 * 1024
 
         self.inquirer = None
 
@@ -973,8 +973,7 @@ class Knot(Server):
             s.item_str("zonefile-sync", self.zonefile_sync)
         else:
             s.item_str("zonefile-sync", "1d")
-        if self.journal_size:
-            s.item_str("max-journal-size", self.journal_size)
+        s.item_str("max-journal-size", self.journal_size)
         s.item_str("semantic-checks", "on")
         if self.disable_any:
             s.item_str("disable-any", "on")

@@ -123,6 +123,28 @@ int changeset_rem_rrset(changeset_t *ch, const knot_rrset_t *rrset, unsigned fla
 int changeset_merge(changeset_t *ch1, const changeset_t *ch2);
 
 /*!
+ * \brief Serialize changeset's unserialized data..
+ *
+ * \param ch        Serialize this changeset.
+ * \param entry     Serialize into here.
+ * \param max_size  Serialize this max bytes.
+ *
+ * \return KNOT_E*
+ */
+int changeset_pack_to(const changeset_t *ch, char *entry, size_t max_size);
+
+/*!
+ * \brief Unpacks changeset's serialized data into their respective fields.
+ *
+ * \param ch    Unpack to this changeset.
+ * \param from  Unpack from here.
+ * \param len   Unpack this much data.
+ *
+ * \return KNOT_E*
+ */
+int changeset_unpack_from(changeset_t *ch, void *src, size_t len);
+
+/*!
  * \brief Clears changesets in list. Changesets are not free'd. Legacy.
  *
  * \param chgs  Changeset list to clear.
