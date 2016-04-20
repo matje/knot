@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 /*! \brief Changeset addition/removal flags */
 enum {
-	CHANGESET_NONE = 0,
+	CHANGESET_NONE  = 0,
 	CHANGESET_CHECK = 1 << 0, /*! Perform redundancy check on additions/removals */
 };
 
@@ -53,6 +53,15 @@ typedef struct {
 } changeset_iter_t;
 
 /*!
+ * \brief Creates new changeset structure and inits it.
+ *
+ * \param apex  Zone apex DNAME.
+ *
+ * \return Changeset structure on success, NULL on errors.
+ */
+changeset_t *changeset_new(const knot_dname_t *apex);
+
+/*!
  * \brief Inits changeset structure.
  *
  * \param ch    Changeset to init.
@@ -61,15 +70,6 @@ typedef struct {
  * \return KNOT_E*
  */
 int changeset_init(changeset_t *ch, const knot_dname_t *apex);
-
-/*!
- * \brief Creates new changeset structure and inits it.
- *
- * \param apex  Zone apex DNAME.
- *
- * \return Changeset structure on success, NULL on errors.
- */
-changeset_t *changeset_new(const knot_dname_t *apex);
 
 /*!
  * \brief Checks whether changeset is empty, i.e. no change will happen after its application.
@@ -121,28 +121,6 @@ int changeset_rem_rrset(changeset_t *ch, const knot_rrset_t *rrset, unsigned fla
  * \return KNOT_E*
  */
 int changeset_merge(changeset_t *ch1, const changeset_t *ch2);
-
-/*!
- * \brief Serialize changeset's unserialized data..
- *
- * \param ch        Serialize this changeset.
- * \param entry     Serialize into here.
- * \param max_size  Serialize this max bytes.
- *
- * \return KNOT_E*
- */
-int changeset_pack_to(const changeset_t *ch, char *entry, size_t max_size);
-
-/*!
- * \brief Unpacks changeset's serialized data into their respective fields.
- *
- * \param ch    Unpack to this changeset.
- * \param from  Unpack from here.
- * \param len   Unpack this much data.
- *
- * \return KNOT_E*
- */
-int changeset_unpack_from(changeset_t *ch, void *src, size_t len);
 
 /*!
  * \brief Clears changesets in list. Changesets are not free'd. Legacy.
