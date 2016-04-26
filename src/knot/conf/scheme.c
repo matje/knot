@@ -153,7 +153,8 @@ static const yp_item_t desc_remote[] = {
 	{ C_DISABLE_ANY,         YP_TBOOL, YP_VNONE }, \
 	{ C_ZONEFILE_SYNC,       YP_TINT,  YP_VINT = { -1, INT32_MAX, 0, YP_STIME } }, \
 	{ C_IXFR_DIFF,           YP_TBOOL, YP_VNONE }, \
-	{ C_MAX_JOURNAL_SIZE,    YP_TINT,  YP_VINT = { 0, INT64_MAX, 1024*1024*1024, YP_SSIZE } }, \
+	{ C_MAX_JOURNAL_SIZE,    YP_TINT,  YP_VINT = { 1024 * 1024, INT64_MAX, \
+	                                               1024 * 1024 * 1024, YP_SSIZE } }, \
 	{ C_DNSSEC_SIGNING,      YP_TBOOL, YP_VNONE }, \
 	{ C_KASP_DB,             YP_TSTR,  YP_VSTR = { "keys" } }, \
 	{ C_SERIAL_POLICY,       YP_TOPT,  YP_VOPT = { serial_policies, SERIAL_POLICY_INCREMENT } }, \

@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #include <tap/files.h>
 
 #include "libknot/libknot.h"
+#define JOURNAL_TEST_ENV
 #include "knot/server/journal.h"
 #include "knot/zone/zone.h"
 #include "knot/zone/zone-diff.h"
@@ -83,9 +84,6 @@ static void init_random_rr(knot_rrset_t *rr , const knot_dname_t *apex)
 static void init_random_changeset(changeset_t *ch, const uint32_t from, const uint32_t to,
                                   const size_t size, const knot_dname_t *apex)
 {
-	int ret = changeset_init(ch, apex);
-	assert(ret == KNOT_EOK);
-
 	// Add SOAs
 	knot_rrset_t soa;
 	init_soa(&soa, from, apex);
@@ -116,6 +114,24 @@ static void init_random_changeset(changeset_t *ch, const uint32_t from, const ui
 		assert(ret == KNOT_EOK);
 		knot_rrset_clear(&rr, NULL);
 	}
+}
+
+static void changeset_set_soa_serials(changeset_t *ch, uint32_t from, uint32_t to,
+                                      const knot_dname_t *apex)
+{
+	knot_rrset_t soa;
+
+	init_soa(&soa, from, apex);
+	knot_rrset_free(&ch->soa_from, NULL);
+	ch->soa_from = knot_rrset_copy(&soa, NULL);
+	assert(ch->soa_from);
+	knot_rrset_clear(&soa, NULL);
+
+	init_soa(&soa, to, apex);
+	knot_rrset_free(&ch->soa_to, NULL);
+	ch->soa_to = knot_rrset_copy(&soa, NULL);
+	assert(ch->soa_to);
+	knot_rrset_clear(&soa, NULL);
 }
 
 /*! \brief Compare two changesets for equality. */
@@ -196,24 +212,22 @@ static bool test_continuity(list_t *l)
 }
 
 /*! \brief Test behavior with real changesets. */
-static void test_store_load(char *jfilename)
+static void test_store_load(journal_t *j, char *jfilename)
 {
-	const size_t filesize = 1 * 1024 * 1024;
-	journal_t *j = journal_open(jfilename, filesize);
+	/*\todo: set this to something >1MiB, as we need to test setting smaller mapsizes. */
+	const size_t filesize = 2 * 1024 * 1024;
 	uint8_t *apex = (uint8_t *)"\4test";
-
-	/* Create fake zone. */
-	zone_t z = { .name = apex };
+	int ret = journal_open(j, jfilename, filesize, apex);
 
 	/* Save and load changeset. */
 	changeset_t *m_ch = changeset_new(apex);
 	init_random_changeset(m_ch, 0, 1, 128, apex);
-	int ret = journal_store_changeset(j, m_ch);
+	ret = journal_store_changeset(j, m_ch);
 	ok(ret == KNOT_EOK, "journal: store changeset");
 	list_t l, k;
 	init_list(&l);
 	init_list(&k);
-	ret = journal_load_changesets(j, z.name, &l, 0);
+	ret = journal_load_changesets(j, &l, 0);
 	add_tail(&k, &m_ch->n);
 	ok(ret == KNOT_EOK && changesets_list_eq(&l, &k), "journal: load changeset");
 
@@ -233,6 +247,7 @@ static void test_store_load(char *jfilename)
 		init_random_changeset(m_ch, serial, serial + 1, 128, apex);
 		ret = journal_store_changeset(j, m_ch);
 		if (ret != KNOT_EOK) {
+			changeset_free(m_ch);
 			break;
 		}
 		add_tail(&k, &m_ch->n);
@@ -240,36 +255,33 @@ static void test_store_load(char *jfilename)
 	ok(ret == KNOT_EBUSY, "journal: overfill with changesets (%d inserted)", serial);
 
 	/* Load all changesets stored until now. */
-	serial--;
-	ret = journal_load_changesets(j, z.name, &l, 1);
+	ret = journal_load_changesets(j, &l, 1);
 	ok(ret == KNOT_EOK && changesets_list_eq(&l, &k), "journal: load changesets");
 
-	int i;
-	for (i = 0; i < 2; ++i) {
-		changesets_free(&l);
-		init_list(&l);
-		ret = journal_load_changesets(j, z.name, &l, 1);
-		ok(ret == KNOT_EOK && changesets_list_eq(&l, &k), "journal: re-load changesets");
-		if (ret != KNOT_EOK) {
-			break;
-		}
-	}
+	changesets_free(&l);
+	init_list(&l);
+	ret = journal_load_changesets(j, &l, 1);
+	ok(ret == KNOT_EOK && changesets_list_eq(&l, &k), "journal: re-load changesets");
 
 	changesets_free(&l);
-	changesets_free(&k);
 	init_list(&l);
-	init_list(&k);
 
 	/* Flush the journal. */
 	ret = journal_flush(j);
 	ok(ret == KNOT_EOK, "journal: second flush");
 
-	/* Test whether the journal really flushed (at least the first changeset). */
-	ret = journal_load_changesets(j, z.name, &l, 1);
-	ok(ret == KNOT_ENOENT, "journal: load right after flush");
+	/* Test whether the journal really flushed. */
+	ret = journal_load_changesets(j, &l, 1);
+	ok(ret == KNOT_EOK && changesets_list_eq(&l, &k), "journal: load right after flush");
+
+	changesets_free(&k);
+	changesets_free(&l);
+	init_list(&k);
+	init_list(&l);
 
 	/* Store next changeset. */
 	changeset_t ch;
+	changeset_init(&ch, apex);
 	init_random_changeset(&ch, serial, serial + 1, 128, apex);
 	ret = journal_store_changeset(j, &ch);
 		changeset_clear(&ch);
@@ -277,7 +289,7 @@ static void test_store_load(char *jfilename)
 
 	/* Load last changesets. */
 	init_list(&l);
-	ret = journal_load_changesets(j, z.name, &l, serial);
+	ret = journal_load_changesets(j, &l, serial);
 	changesets_free(&l);
 	ok(ret == KNOT_EOK, "journal: load changesets after flush");
 
@@ -300,7 +312,7 @@ static void test_store_load(char *jfilename)
 	init_list(&l);
 
 	/* Load all previous changesets. */
-	ret = journal_load_changesets(j, z.name, &l, 1);
+	ret = journal_load_changesets(j, &l, 1);
 	ok(ret == KNOT_EOK && knot_soa_serial(&((changeset_t *)TAIL(l))->soa_to->rrs) == m_serial,
 	   "journal: load all changesets");
 
@@ -310,25 +322,30 @@ static void test_store_load(char *jfilename)
 	/* Cleanup. */
 	changesets_free(&l);
 	init_list(&l);
-
-	journal_close(&j);
+	assert(journal_flush(j) == KNOT_EOK);
+	journal_close(j);
 }
 
-static void test_stress_base(char *jfilename, size_t update_size, size_t file_size)
+static void test_stress_base(journal_t *j, char *jfilename, size_t update_size, size_t file_size)
 {
+	int ret;
 	const uint8_t *apex = (uint8_t *)"\4test";
+	uint32_t serial = 0;
+
+	changeset_t ch;
+	changeset_init(&ch, apex);
+	init_random_changeset(&ch, serial, serial + 1, update_size, apex);
 
 	for (int i = 1; i <= 6; ++i) {
-		uint32_t serial = 0;
+		serial = 0;
 		while (true) {
-			journal_t *j = journal_open(jfilename, file_size);
-			assert(j);
+			ret = journal_open(j, jfilename, file_size, apex);
+			assert(ret == KNOT_EOK);
 
-			changeset_t ch;
-			init_random_changeset(&ch, serial, serial + 1, update_size, apex);
-			int ret = journal_store_changeset(j, &ch);
-			changeset_clear(&ch);
-			journal_close(&j);
+			changeset_set_soa_serials(&ch, serial, serial + 1, apex);
+			ret = journal_store_changeset(j, &ch);
+
+			journal_close(j);
 			if (ret == KNOT_EOK) {
 				serial++;
 			} else {
@@ -336,60 +353,64 @@ static void test_stress_base(char *jfilename, size_t update_size, size_t file_si
 			}
 		}
 
-		journal_t *j = journal_open(jfilename, file_size);
-		assert(j);
+		ret = journal_open(j, jfilename, file_size, apex);
+		assert(ret == KNOT_EOK);
 
 		int ret = journal_flush(j);
-		journal_close(&j);
+		journal_close(j);
 		ok(serial > 0 && ret == KNOT_EOK, "journal: pass #%d fillup run (%d inserts)",
 		   i, serial);
 	}
+
+	changeset_clear(&ch);
 }
 
 /*! \brief Test behavior when writing to jurnal and flushing it. */
-static void test_stress(char * jfilename)
+static void test_stress(journal_t *j, char *jfilename)
 {
 	printf("stress test: small data\n");
-	test_stress_base(jfilename, 40, 512 * 1024);
+	test_stress_base(j, jfilename, 40, 1024 * 1024);
 
 	printf("stress test: medium data\n");
-	test_stress_base(jfilename, 400, 3 * 1024 * 1024);
+	test_stress_base(j, jfilename, 400, 3 * 1024 * 1024);
 
 	printf("stress test: large data\n");
-	test_stress_base(jfilename, 4000, 30 * 1024 * 1024);
+	test_stress_base(j, jfilename, 4000, 30 * 1024 * 1024);
 }
 
 int main(int argc, char *argv[])
 {
 	plan_lazy();
 
+	const uint8_t *apex = (uint8_t *)"\4test";
+
 	/* Create tmpdir */
 	char *jfilename = test_mkdtemp();
 	ok(jfilename != NULL, "make temporary directory");
 
-	/* Try to open journal with too small fsize. */
-	journal_t *journal = journal_open(jfilename, 1024);
-	ok(journal != NULL && journal->fslimit >= 1024, "journal: open too small");
-	journal_close(&journal);
+	journal_t *j = journal_new();
+	assert(j);
 
-	/* Try to open journal with unlimited fsize. */
-	journal = journal_open(jfilename, 0);
-	ok(journal != NULL, "journal: open unlimited");
-	journal_close(&journal);
+	/* Try to open journal with too small fsize. */
+	int ret = journal_open(j, jfilename, 1024, apex);
+	ok(ret == KNOT_EOK, "journal: open too small");
+	journal_close(j);
 
 	/* Open/create new journal. */
-	journal = journal_open(jfilename, 10 * 1024 * 1024);
-	ok(journal != NULL, "journal: open journal '%s'", jfilename);
-	if (journal == NULL) {
+	ret = journal_open(j, jfilename, 10 * 1024 * 1024, apex);
+	ok(ret == KNOT_EOK, "journal: open journal '%s'", jfilename);
+	if (j == NULL) {
 		goto skip_all;
 	}
 
 	/* Close journal. */
-	journal_close(&journal);
+	journal_close(j);
 
-	test_store_load(jfilename);
+	test_store_load(j, jfilename);
 
-	test_stress(jfilename);
+	test_stress(j, jfilename);
+
+	journal_free(&j);
 
 	/* Delete journal. */
 	test_rm_rf(jfilename);

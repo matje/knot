@@ -40,35 +40,40 @@ static void free_ddns_queue(zone_t *z)
 	ptrlist_free(&z->ddns_queue, NULL);
 }
 
+static int flush_journal(conf_t *conf, zone_t *zone);
+
 /*! \brief Open journal for zone. */
-static void init_journal(conf_t *conf, zone_t *zone)
+static int open_journal(conf_t *conf, zone_t *zone)
 {
 	assert(zone);
-	if (zone->journal != NULL) {
-		return; /* Journal is already open */
-	}
 
 	conf_val_t val = conf_zone_get(conf, C_MAX_JOURNAL_SIZE, zone->name);
 	int64_t journal_fslimit = conf_int(&val);
 	char *journal_file = conf_journalfile(conf, zone->name);
 
-	zone->journal = journal_open(journal_file, journal_fslimit);
-	if (zone->journal == NULL) {
+	int ret = journal_open(zone->journal, journal_file, journal_fslimit, zone->name);
+	if (ret == KNOT_EAGAIN) {
+		/* It seems we are opening with a smaller mapsize than originally
+		 * and journal still has unflushed changes. Flush zone, close and retry. */
+		 flush_journal(conf, zone);
+		 journal_close(zone->journal);
+		 ret = journal_open(zone->journal, journal_file, journal_fslimit, zone->name);
+	}
+	if (ret != KNOT_EOK) {
 		log_zone_error(zone->name, "failed to open journal '%s'",
 		               journal_file);
 	}
 	free(journal_file);
+
+	return ret;
 }
 
 /*! \brief Close the zone journal. */
-static void deinit_journal(zone_t *zone)
+static void close_journal(zone_t *zone)
 {
 	assert(zone);
-	if (zone->journal == NULL) {
-		return;
-	}
 
-	journal_close(&zone->journal);
+	journal_close(zone->journal);
 }
 
 static int flush_journal(conf_t *conf, zone_t *zone)
@@ -124,9 +129,11 @@ static int flush_journal(conf_t *conf, zone_t *zone)
 	zone->zonefile_serial = serial_to;
 
 	/* Flush journal. */
-	ret = journal_flush(zone->journal);
-	if (ret != KNOT_EOK) {
-		return ret;
+	if (zone->journal) {
+		ret = journal_flush(zone->journal);
+		if (ret != KNOT_EOK) {
+			return ret;
+		}
 	}
 
 	/* Trim extra heap. */
@@ -145,6 +152,14 @@ zone_t* zone_new(const knot_dname_t *name)
 
 	zone->name = knot_dname_copy(name, NULL);
 	if (zone->name == NULL) {
+		free(zone);
+		return NULL;
+	}
+
+	// Journal
+	zone->journal = journal_new();
+	if (zone->journal == NULL) {
+		knot_dname_free(&zone->name, NULL);
 		free(zone);
 		return NULL;
 	}
@@ -181,6 +196,8 @@ void zone_free(zone_t **zone_ptr)
 
 	knot_dname_free(&zone->name, NULL);
 
+	journal_free(&zone->journal);
+
 	free_ddns_queue(zone);
 	pthread_mutex_destroy(&zone->ddns_lock);
 	pthread_mutex_destroy(&zone->journal_lock);
@@ -205,8 +222,13 @@ int zone_change_store(conf_t *conf, zone_t *zone, changeset_t *change)
 	}
 
 	pthread_mutex_lock(&zone->journal_lock);
-	init_journal(conf, zone);
-	int ret = journal_store_changeset(zone->journal, change);
+	int ret = open_journal(conf, zone);
+	if (ret != KNOT_EOK) {
+		pthread_mutex_unlock(&zone->journal_lock);
+		return ret;
+	}
+
+	ret = journal_store_changeset(zone->journal, change);
 	if (ret == KNOT_EBUSY) {
 		log_zone_notice(zone->name, "journal is full, flushing");
 
@@ -216,7 +238,7 @@ int zone_change_store(conf_t *conf, zone_t *zone, changeset_t *change)
 			ret = journal_store_changeset(zone->journal, change);
 		}
 	}
-	deinit_journal(zone);
+	close_journal(zone);
 	pthread_mutex_unlock(&zone->journal_lock);
 
 	return ret;
@@ -229,8 +251,13 @@ int zone_changes_store(conf_t *conf, zone_t *zone, list_t *chgs)
 	}
 
 	pthread_mutex_lock(&zone->journal_lock);
-	init_journal(conf, zone);
-	int ret = journal_store_changesets(zone->journal, chgs);
+	int ret = open_journal(conf, zone);
+	if (ret != KNOT_EOK) {
+		pthread_mutex_unlock(&zone->journal_lock);
+		return ret;
+	}
+
+	ret = journal_store_changesets(zone->journal, chgs);
 	if (ret == KNOT_EBUSY) {
 		log_zone_notice(zone->name, "journal is full, flushing");
 
@@ -241,7 +268,7 @@ int zone_changes_store(conf_t *conf, zone_t *zone, list_t *chgs)
 		}
 
 	}
-	deinit_journal(zone);
+	close_journal(zone);
 	pthread_mutex_unlock(&zone->journal_lock);
 
 	return ret;
@@ -253,11 +280,44 @@ int zone_changes_load(conf_t *conf, zone_t *zone, list_t *dst, uint32_t from)
 		return KNOT_EINVAL;
 	}
 
-	pthread_mutex_lock((pthread_mutex_t *)&zone->journal_lock);
-	init_journal(conf, zone);
-	int ret = journal_load_changesets(zone->journal, zone->name, dst, from);
-	deinit_journal(zone);
-	pthread_mutex_unlock((pthread_mutex_t *)&zone->journal_lock);
+	pthread_mutex_lock(&zone->journal_lock);
+	int ret = open_journal(conf, zone);
+	if (ret != KNOT_EOK) {
+		pthread_mutex_unlock(&zone->journal_lock);
+		return ret;
+	}
+
+	ret = journal_load_changesets(zone->journal, dst, from);
+	close_journal(zone);
+	pthread_mutex_unlock(&zone->journal_lock);
+
+	return ret;
+}
+
+int zone_flush_journal(conf_t *conf, zone_t *zone)
+{
+	if (conf == NULL || zone == NULL) {
+		return KNOT_EINVAL;
+	}
+
+	int ret = 0;
+	char *journal_file = conf_journalfile(conf, zone->name);
+	bool j_exists = journal_exists(journal_file);
+	free(journal_file);
+	pthread_mutex_lock(&zone->journal_lock);
+	if (j_exists) {
+		ret = open_journal(conf, zone);
+		if (ret != KNOT_EOK) {
+			pthread_mutex_unlock(&zone->journal_lock);
+			return ret;
+		}
+	}
+
+	ret = flush_journal(conf, zone);
+	if (j_exists) {
+		close_journal(zone);
+	}
+	pthread_mutex_unlock(&zone->journal_lock);
 
 	return ret;
 }
@@ -395,28 +455,6 @@ int zone_master_try(conf_t *conf, zone_t *zone, zone_master_cb callback,
 	return success ? KNOT_EOK : KNOT_ENOMASTER;
 }
 
-int zone_flush_journal(conf_t *conf, zone_t *zone)
-{
-	if (conf == NULL || zone == NULL) {
-		return KNOT_EINVAL;
-	}
-
-	char *journal_file = conf_journalfile(conf, zone->name);
-	bool j_exists = journal_exists(journal_file);
-	free(journal_file);
-
-	pthread_mutex_lock(&zone->journal_lock);
-	if (j_exists) {
-		init_journal(conf, zone);
-	}
-	int ret = flush_journal(conf, zone);
-	if (j_exists) {
-		deinit_journal(zone);
-	}
-	pthread_mutex_unlock(&zone->journal_lock);
-
-	return ret;
-}
 
 int zone_update_enqueue(zone_t *zone, knot_pkt_t *pkt, struct process_query_param *param)
 {
