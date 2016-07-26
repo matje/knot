@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -20,9 +20,10 @@
 #include "contrib/openbsd/strlcpy.h"
 
 /* Compiled-in module headers. */
-#include "knot/modules/synth_record.h"
 #include "knot/modules/dnsproxy.h"
 #include "knot/modules/online_sign/module.h"
+#include "knot/modules/rrl.h"
+#include "knot/modules/synth_record.h"
 #ifdef HAVE_ROSEDB
 #include "knot/modules/rosedb.h"
 #endif
@@ -39,6 +40,7 @@ typedef struct static_module {
 
 /*! \note All modules should be dynamically loaded later on. */
 static_module_t MODULES[] = {
+        { C_MOD_RRL,          &rrl_load,          &rrl_unload,          MOD_SCOPE_ANY },
         { C_MOD_SYNTH_RECORD, &synth_record_load, &synth_record_unload, MOD_SCOPE_ANY },
         { C_MOD_DNSPROXY,     &dnsproxy_load,     &dnsproxy_unload,     MOD_SCOPE_ANY },
         { C_MOD_ONLINE_SIGN,  &online_sign_load,  &online_sign_unload,  MOD_SCOPE_ZONE },

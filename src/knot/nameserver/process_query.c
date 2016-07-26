@@ -393,10 +393,9 @@ static int set_rcode_to_packet(knot_pkt_t *pkt, struct query_data *qdata)
 	return ret;
 }
 
-static int process_query_err(knot_layer_t *ctx, knot_pkt_t *pkt)
+int process_query_error(knot_pkt_t *pkt, struct query_data *qdata)
 {
-	assert(pkt && ctx);
-	struct query_data *qdata = QUERY_DATA(ctx);
+	assert(pkt && qdata);
 
 	/* Initialize response from query packet. */
 	knot_pkt_t *query = qdata->query;
@@ -422,6 +421,13 @@ static int process_query_err(knot_layer_t *ctx, knot_pkt_t *pkt)
 	(void) process_query_sign_response(pkt, qdata);
 
 	return KNOT_STATE_DONE;
+}
+
+static int process_query_err(knot_layer_t *ctx, knot_pkt_t *pkt)
+{
+	struct query_data *qdata = QUERY_DATA(ctx);
+
+	return process_query_error(pkt, qdata);
 }
 
 /*!

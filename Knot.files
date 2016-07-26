@@ -264,6 +264,8 @@ src/knot/modules/online_sign/nsec_next.h
 src/knot/modules/rosedb.c
 src/knot/modules/rosedb.h
 src/knot/modules/rosedb_tool.c
+src/knot/modules/rrl.c
+src/knot/modules/rrl.h
 src/knot/modules/synth_record.c
 src/knot/modules/synth_record.h
 src/knot/nameserver/axfr.c

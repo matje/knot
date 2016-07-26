@@ -28,9 +28,10 @@
 #include "dnssec/lib/dnssec/tsig.h"
 #include "dnssec/lib/dnssec/key.h"
 
-#include "knot/modules/synth_record.h"
 #include "knot/modules/dnsproxy.h"
 #include "knot/modules/online_sign/module.h"
+#include "knot/modules/rrl.h"
+#include "knot/modules/synth_record.h"
 #ifdef HAVE_ROSEDB
 #include "knot/modules/rosedb.h"
 #endif
@@ -247,6 +248,8 @@ const yp_item_t conf_scheme[] = {
 	{ C_ACL,      YP_TGRP, YP_VGRP = { desc_acl }, YP_FMULTI, { check_acl } },
 	{ C_RMT,      YP_TGRP, YP_VGRP = { desc_remote }, YP_FMULTI, { check_remote } },
 /* MODULES */
+	{ C_MOD_RRL,          YP_TGRP, YP_VGRP = { scheme_mod_rrl }, YP_FMULTI,
+	                                         { check_mod_rrl } },
 	{ C_MOD_SYNTH_RECORD, YP_TGRP, YP_VGRP = { scheme_mod_synth_record }, YP_FMULTI,
 	                                         { check_mod_synth_record } },
 	{ C_MOD_DNSPROXY,     YP_TGRP, YP_VGRP = { scheme_mod_dnsproxy }, YP_FMULTI,

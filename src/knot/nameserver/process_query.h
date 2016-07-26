@@ -144,4 +144,14 @@ void process_query_qname_case_restore(struct query_data *qdata, knot_pkt_t *pkt)
  */
 int process_query_qname_case_lower(knot_pkt_t *pkt);
 
+/*!
+ * \brief Error answer.
+ *
+ * \param pkt    Outgoing message.
+ * \param qdata  Query data.
+ *
+ * \return KNOT_STATE_DONE if finished.
+ */
+int process_query_error(knot_pkt_t *pkt, struct query_data *qdata);
+
 /*! @} */
