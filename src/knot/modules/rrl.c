@@ -52,6 +52,8 @@ int check_mod_rrl(conf_check_t *args)
 
 typedef struct {
 	rrl_table_t *rrl;
+	int slip;
+	conf_val_t whitelist;
 } rrl_ctx_t;
 
 static int ratelimit_apply(int state, knot_pkt_t *pkt, struct query_data *qdata, void *ctx)
@@ -63,8 +65,7 @@ static int ratelimit_apply(int state, knot_pkt_t *pkt, struct query_data *qdata,
 	rrl_ctx_t *context = ctx;
 
 	/* Exempt clients. */
-	conf_val_t *whitelist = &conf()->cache.srv_rate_limit_whitelist;
-	if (conf_addr_range_match(whitelist, qdata->param->remote)) {
+	if (conf_addr_range_match(&context->whitelist, qdata->param->remote)) {
 		return state;
 	}
 
@@ -82,8 +83,7 @@ static int ratelimit_apply(int state, knot_pkt_t *pkt, struct query_data *qdata,
 	}
 
 	/* Now it is slip or drop. */
-	int slip = conf()->cache.srv_rate_limit_slip;
-	if (slip > 0 && rrl_slip_roll(slip)) {
+	if (context->slip > 0 && rrl_slip_roll(context->slip)) {
 		/* Answer slips. */
 		if (process_query_error(pkt, qdata) != KNOT_STATE_DONE) {
 			return KNOT_STATE_FAIL;
@@ -133,6 +133,14 @@ int rrl_load(struct query_plan *plan, struct query_module *self,
 		rrl_unload(self);
 		return ret;
 	}
+
+	/* Get whitelist */
+	val = conf_mod_get(self->config, MOD_WHITELIST, self->id);
+	ctx->whitelist = val;
+
+	/* Get slip */
+	val = conf_mod_get(self->config, MOD_SLIP, self->id);
+	ctx->slip = conf_int(&val);
 
 	self->ctx = ctx;
 
