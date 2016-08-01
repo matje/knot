@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 '''RRL module functionality test'''
 
 import dns.exception
@@ -14,16 +13,14 @@ from dnstest.utils import *
 t = Test(stress=False)
 ModRRL.check()
 knot = t.server("knot")
+knot_glob = t.server("knot")
 # Initialize server configuration
-local_zone = t.zone("test", storage=".", file_name="test.local_zone")
-remote_zone1 = t.zone("test", storage=".", file_name="test.remote_zone")
-remote_zone2 = t.zone("example.com.")
+zones = t.zone_rnd(3, dnssec=False, records=1)
 
-t.link(local_zone, knot)
-t.link(remote_zone1, knot)
-t.link(remote_zone2, knot)
+t.link(zones, knot)
+t.link(zones, knot_glob)
 
-def send_queries(server, run_time=1.0, query_time=0.05):
+def send_queries(server, name, run_time=1.0, query_time=0.05):
     """
     Send UDP queries to the server for certain time and get replies statistics.
     """
@@ -31,18 +28,16 @@ def send_queries(server, run_time=1.0, query_time=0.05):
     start = time.time()
     while time.time() < start + run_time:
         try:
-            query = dns.message.make_query("example.com", "SOA", want_dnssec=True)
+            query = dns.message.make_query(name, "SOA", want_dnssec=True)
             response = dns.query.udp(query, server.addr, port=server.port, timeout=query_time)
         except dns.exception.Timeout:
             response = None
-
         if response is None:
             dropped += 1
         elif response.flags & dns.flags.TC:
             truncated += 1
         else:
             replied += 1
-
     return dict(replied=replied, truncated=truncated, dropped=dropped)
 
 def rrl_result(name, stats, success):
@@ -54,9 +49,10 @@ def rrl_result(name, stats, success):
         detail_log("error")
         set_err("RRL ERROR")
 
-
 t.start()
-knot.zones_wait(local_zone, remote_zone1, remote_zone2)
+
+knot.zones_wait(zones)
+knot_glob.zones_wait(zones)
 t.sleep(1)
 
 #
@@ -65,37 +61,102 @@ t.sleep(1)
 # counting responses when packets are being dropped.
 #
 
-stats = send_queries(knot)
+# RRL disabled for both
+stats = send_queries(knot, zones[0].name)
 ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
-rrl_result("RRL disabled", stats, ok)
+rrl_result("disabled", stats, ok)
+time.sleep(5)
 
+stats = send_queries(knot_glob, zones[0].name)
+ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
+rrl_result("disabled", stats, ok)
+
+# RRL enabled globaly
+knot_glob.add_module(None, ModRRL(5, None, None, None))
+knot_glob.gen_confile()
+knot_glob.reload()
+
+stats = send_queries(knot_glob, zones[0].name)
+ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
+rrl_result("enabled globaly for zone 1, all slips", stats, ok)
+time.sleep(5)
+
+stats = send_queries(knot_glob, zones[1].name)
+ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
+rrl_result("enabled globaly for zone 2, all slips", stats, ok)
+time.sleep(5)
+
+# RRL enabled globaly, 0 slips
+knot_glob.add_module(None, ModRRL(5, None, 0, None))
+knot_glob.gen_confile()
+knot_glob.reload()
+
+stats = send_queries(knot_glob, zones[0].name)
+ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] == 0 and stats["dropped"] >= 5
+rrl_result("enabled globaly, zone 1, zero slips", stats, ok)
+time.sleep(5)
+
+stats = send_queries(knot_glob, zones[1].name)
+ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] == 0 and stats["dropped"] >= 5
+rrl_result("enabled globaly, zone 2, zero slips", stats, ok)
+time.sleep(5)
+
+# RLL whitelist enabled globaly
+knot_glob.add_module(None, ModRRL(5, None, 2, knot_glob.addr))
+knot_glob.gen_confile()
+knot_glob.reload()
+
+stats = send_queries(knot_glob, zones[0].name)
+ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
+rrl_result("enabled globaly, zone 1, whitelist effective", stats, ok)
+
+stats = send_queries(knot_glob, zones[1].name)
+ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
+rrl_result("enabled globaly, zone 2, whitelist effective", stats, ok)
+
+# RLL enabled for zone1
+knot.add_module(zones[0], ModRRL(5, None, None, None))
+knot.gen_confile()
+knot.reload()
+
+stats = send_queries(knot, zones[0].name)
+ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
+rrl_result("RRL enabled for zone 1, all slips", stats, ok)
+time.sleep(5)
+
+stats = send_queries(knot, zones[1].name)
+ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
+rrl_result("RRL disabled for zone 2", stats, ok)
+time.sleep(5)
+
+# RLL enabled for zone1, 0 slips
+knot.add_module(zones[0], ModRRL(5, None, 0, None))
+knot.gen_confile()
+knot.reload()
+
+stats = send_queries(knot, zones[0].name)
+ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] == 0 and stats["dropped"] >= 5
+rrl_result("enabled for zone 1, 0 slips", stats, ok)
+time.sleep(5)
+
+stats = send_queries(knot, zones[1].name)
+ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
+rrl_result("disabled for zone 2", stats, ok)
+time.sleep(5)
+
+# RLL enabled globaly, whitelist for zone1
+knot.add_module(zones[0], ModRRL(5, None, None, knot.addr))
 knot.add_module(None, ModRRL(5, None, None, None))
 knot.gen_confile()
 knot.reload()
-stats = send_queries(knot)
-ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
-rrl_result("RRL enabled, all slips", stats, ok)
+
+stats = send_queries(knot, zones[0].name)
+ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
+rrl_result("enabled, whitelist effective for zone 1", stats, ok)
 time.sleep(5)
 
-knot.add_module(None, ModRRL(None, None, 0, None))
-knot.gen_confile()
-knot.reload()
-stats = send_queries(knot)
-ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] == 0 and stats["dropped"] >= 5
-rrl_result("RRL enabled, no slips", stats, ok)
-
-knot.add_module(None, ModRRL(None, None, 2, None))
-knot.gen_confile()
-knot.reload()
-stats = send_queries(knot)
-ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 5 and stats["dropped"] >= 5
-rrl_result("RRL enabled, 50% slips", stats, ok)
-
-knot.add_module(None, ModRRL(None, None, None, knot.addr))
-knot.gen_confile()
-knot.reload()
-stats = send_queries(knot)
-ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
-rrl_result("RRL enabled, whitelist effective", stats, ok)
+stats = send_queries(knot, zones[1].name)
+ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
+rrl_result("enabled for zone 2, zone 1 whitelist ineffective", stats, ok)
 
 t.end()
