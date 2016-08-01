@@ -127,7 +127,7 @@ class ModRRL(KnotModule):
                 conf.item_str("rate-limit", self.rate_limit)
         if(self.table_size):	
                 conf.item_str("table-size", self.table_size)
-        if(self.slip):	
+        if(self.slip or self.slip == 0):	
                 conf.item_str("slip", self.slip)
         if(self.whitelist):	
                 conf.item_str("whitelist", self.whitelist)
