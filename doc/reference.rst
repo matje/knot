@@ -1516,5 +1516,3 @@ rate limiting. Empty list means that no incoming connection will be
 white-listed.
 
 *Default:* not set
-
-

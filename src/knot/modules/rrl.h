@@ -18,6 +18,8 @@
  *
  * \brief Module for response-rate limiting
  *
+ * Module provides a mean to apply rate limiting globally. Per zone limiting is not supported yet.
+ *
  * \addtogroup query_processing
  * @{
  */
