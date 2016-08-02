@@ -40,7 +40,7 @@ typedef struct static_module {
 
 /*! \note All modules should be dynamically loaded later on. */
 static_module_t MODULES[] = {
-        { C_MOD_RRL,          &rrl_load,          &rrl_unload,          MOD_SCOPE_ANY },
+	{ C_MOD_RRL,          &rrl_load,          &rrl_unload,          MOD_SCOPE_GLOBAL },
         { C_MOD_SYNTH_RECORD, &synth_record_load, &synth_record_unload, MOD_SCOPE_ANY },
         { C_MOD_DNSPROXY,     &dnsproxy_load,     &dnsproxy_unload,     MOD_SCOPE_ANY },
         { C_MOD_ONLINE_SIGN,  &online_sign_load,  &online_sign_unload,  MOD_SCOPE_ZONE },

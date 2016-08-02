@@ -62,8 +62,6 @@ class Zone(object):
         return self.zfile.name
 
     def add_module(self, module):
-        if(len(self.modules)>0):
-            self.modules.clear()
         self.modules.append(module)
     def clear_modules(self):
         self.modules.clear()
@@ -648,12 +646,9 @@ class Server(object):
 
     def add_module(self, zone, module):
         zone = zone_arg_check(zone)
-
         if zone:
             self.zones[zone.name].add_module(module)
         else:
-            if(len(self.modules)>0):
-                self.modules.clear()
             self.modules.append(module)
 
     def clear_modules(self, zone):

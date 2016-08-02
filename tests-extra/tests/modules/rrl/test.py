@@ -87,6 +87,7 @@ rrl_result("enabled globaly for zone 2, all slips", stats, ok)
 time.sleep(2)
 
 # RRL enabled globaly, 0 slips
+knot_glob.clear_modules(None)
 knot_glob.add_module(None, ModRRL(5, None, 0, None))
 knot_glob.gen_confile()
 knot_glob.reload()
@@ -102,6 +103,7 @@ rrl_result("enabled globaly, zone 2, zero slips", stats, ok)
 time.sleep(2)
 
 # RLL whitelist enabled globaly
+knot_glob.clear_modules(None)
 knot_glob.add_module(None, ModRRL(5, None, 2, knot_glob.addr))
 knot_glob.gen_confile()
 knot_glob.reload()
@@ -114,6 +116,8 @@ stats = send_queries(knot_glob, zones[1].name)
 ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
 rrl_result("enabled globaly, zone 2, whitelist effective", stats, ok)
 
+# Tests for per zone rrl, not supported atm.
+'''
 # RLL enabled for zone1
 knot.add_module(zones[0], ModRRL(5, None, None, None))
 knot.gen_confile()
@@ -130,6 +134,7 @@ rrl_result("disabled for zone 2", stats, ok)
 time.sleep(2)
 
 # RLL enabled for zone1, 0 slips
+knot.clear_modules(zones[0])
 knot.add_module(zones[0], ModRRL(5, None, 0, None))
 knot.gen_confile()
 knot.reload()
@@ -145,6 +150,7 @@ rrl_result("disabled for zone 2", stats, ok)
 time.sleep(2)
 
 # RLL enabled globaly, whitelist for zone1
+knot.clear_modules(zones[0])
 knot.add_module(zones[0], ModRRL(5, None, None, knot.addr))
 knot.add_module(zones[1], ModRRL(5, None, None, None))
 knot.clear_modules(None)
@@ -159,5 +165,5 @@ time.sleep(2)
 stats = send_queries(knot, zones[1].name)
 ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
 rrl_result("enabled for zone 2, zone 1 whitelist ineffective", stats, ok)
-
+'''
 t.end()
