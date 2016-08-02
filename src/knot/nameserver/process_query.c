@@ -530,32 +530,6 @@ static int process_query_out(knot_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	/*
-	 * Postprocessing.
-	 */
-
-	if (next_state == KNOT_STATE_DONE || next_state == KNOT_STATE_PRODUCE) {
-
-		/* Restore original QNAME. */
-		process_query_qname_case_restore(qdata, pkt);
-
-		if (pkt->current != KNOT_ADDITIONAL) {
-			knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-		}
-
-		/* Put OPT RR to the additional section. */
-		ret = answer_edns_put(pkt, qdata);
-		if (ret != KNOT_EOK) {
-			next_state = KNOT_STATE_FAIL;
-			goto finish;
-		}
-
-		/* Transaction security (if applicable). */
-		if (process_query_sign_response(pkt, qdata) != KNOT_EOK) {
-			next_state = KNOT_STATE_FAIL;
-		}
-	}
-
 finish:
 	/* Default RCODE is SERVFAIL if not specified otherwise. */
 	if (next_state == KNOT_STATE_FAIL && qdata->rcode == KNOT_RCODE_NOERROR) {
@@ -570,16 +544,16 @@ finish:
 	}
 	/* In case of NS_PROC_FAIL, RCODE is set in the error-processing function. */
 
-	/* Rate limits (if applicable). */
-	if (qdata->param->proc_flags & NS_QUERY_LIMIT_RATE) {
-		next_state = ratelimit_apply(next_state, pkt, ctx);
-	}
-
 	/* After query processing code. */
 	if (plan) {
 		WALK_LIST(step, plan->stage[QPLAN_END]) {
 			next_state = step->process(next_state, pkt, qdata, step->ctx);
 		}
+	}
+
+	/* Rate limits (if applicable). */
+	if (qdata->param->proc_flags & NS_QUERY_LIMIT_RATE) {
+		next_state = ratelimit_apply(next_state, pkt, ctx);
 	}
 
 	rcu_read_unlock();

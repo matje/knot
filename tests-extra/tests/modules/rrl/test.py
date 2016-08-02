@@ -65,7 +65,7 @@ t.sleep(1)
 stats = send_queries(knot, zones[0].name)
 ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
 rrl_result("disabled", stats, ok)
-time.sleep(5)
+time.sleep(2)
 
 stats = send_queries(knot_glob, zones[0].name)
 ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
@@ -79,12 +79,12 @@ knot_glob.reload()
 stats = send_queries(knot_glob, zones[0].name)
 ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
 rrl_result("enabled globaly for zone 1, all slips", stats, ok)
-time.sleep(5)
+time.sleep(2)
 
 stats = send_queries(knot_glob, zones[1].name)
 ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
 rrl_result("enabled globaly for zone 2, all slips", stats, ok)
-time.sleep(5)
+time.sleep(2)
 
 # RRL enabled globaly, 0 slips
 knot_glob.add_module(None, ModRRL(5, None, 0, None))
@@ -94,12 +94,12 @@ knot_glob.reload()
 stats = send_queries(knot_glob, zones[0].name)
 ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] == 0 and stats["dropped"] >= 5
 rrl_result("enabled globaly, zone 1, zero slips", stats, ok)
-time.sleep(5)
+time.sleep(2)
 
 stats = send_queries(knot_glob, zones[1].name)
 ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] == 0 and stats["dropped"] >= 5
 rrl_result("enabled globaly, zone 2, zero slips", stats, ok)
-time.sleep(5)
+time.sleep(2)
 
 # RLL whitelist enabled globaly
 knot_glob.add_module(None, ModRRL(5, None, 2, knot_glob.addr))
@@ -121,13 +121,13 @@ knot.reload()
 
 stats = send_queries(knot, zones[0].name)
 ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
-rrl_result("RRL enabled for zone 1, all slips", stats, ok)
-time.sleep(5)
+rrl_result("enabled for zone 1, all slips", stats, ok)
+time.sleep(2)
 
 stats = send_queries(knot, zones[1].name)
 ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
-rrl_result("RRL disabled for zone 2", stats, ok)
-time.sleep(5)
+rrl_result("disabled for zone 2", stats, ok)
+time.sleep(2)
 
 # RLL enabled for zone1, 0 slips
 knot.add_module(zones[0], ModRRL(5, None, 0, None))
@@ -137,23 +137,24 @@ knot.reload()
 stats = send_queries(knot, zones[0].name)
 ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] == 0 and stats["dropped"] >= 5
 rrl_result("enabled for zone 1, 0 slips", stats, ok)
-time.sleep(5)
+time.sleep(2)
 
 stats = send_queries(knot, zones[1].name)
 ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
 rrl_result("disabled for zone 2", stats, ok)
-time.sleep(5)
+time.sleep(2)
 
 # RLL enabled globaly, whitelist for zone1
 knot.add_module(zones[0], ModRRL(5, None, None, knot.addr))
-knot.add_module(None, ModRRL(5, None, None, None))
+knot.add_module(zones[1], ModRRL(5, None, None, None))
+knot.clear_modules(None)
 knot.gen_confile()
 knot.reload()
 
 stats = send_queries(knot, zones[0].name)
 ok = stats["replied"] >= 100 and stats["truncated"] == 0 and stats["dropped"] == 0
 rrl_result("enabled, whitelist effective for zone 1", stats, ok)
-time.sleep(5)
+time.sleep(2)
 
 stats = send_queries(knot, zones[1].name)
 ok = stats["replied"] > 0 and stats["replied"] < 100 and stats["truncated"] >= 100 and stats["dropped"] == 0
