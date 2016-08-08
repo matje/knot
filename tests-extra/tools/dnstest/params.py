@@ -4,7 +4,7 @@
 This module allows interchanging of running parameters between modules.
 '''
 
-import os, shutil
+import os, shutil, subprocess
 
 module_path = os.path.dirname(os.path.realpath(__file__))
 repo_path = os.path.realpath(os.path.join(module_path, "..", "..", ".."))
@@ -64,6 +64,16 @@ bind_ctl = get_binary("KNOT_TEST_BINDC", "rndc")
 #nsd_bin = get_binary("KNOT_TEST_NSD", "nsd")
 # KNOT_TEST_NSDC - Nsd control binary.
 #nsd_ctl = get_binary("KNOT_TEST_NSDC", "nsdc")
+# KNOT_LIBFAKETIME - path to library faketime, "" use system default
+libfaketime_path = get_param("KNOT_LIBFAKETIME", "")
+if not libfaketime_path:
+    try:
+        env = os.environ.copy()
+        env.pop("LD_PRELOAD", 0)
+        libfaketime_path = str(subprocess.check_output(
+            "faketime -m 0 sh -c 'echo $LD_PRELOAD'", env=env, shell=True))
+    except subprocess.CalledProcessError:
+        pass
 
 # KNOT_TEST_OUTS_DIR - working directories location.
 outs_dir = get_param("KNOT_TEST_OUTS_DIR", "/tmp")
