@@ -90,6 +90,8 @@
 #define C_SERIAL_POLICY		"\x0D""serial-policy"
 #define C_SERVER		"\x06""server"
 #define C_SRV			"\x06""server"
+#define C_STATS			"\x0A""statistics"
+#define C_STATS_TIMER		"\x05""timer"
 #define C_STORAGE		"\x07""storage"
 #define C_TARGET		"\x06""target"
 #define C_TCP_HSHAKE_TIMEOUT	"\x15""tcp-handshake-timeout"

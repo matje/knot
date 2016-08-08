@@ -31,6 +31,7 @@
 #include "knot/modules/synth_record.h"
 #include "knot/modules/dnsproxy.h"
 #include "knot/modules/online_sign/module.h"
+#include "knot/modules/query_stats.h"
 #ifdef HAVE_ROSEDB
 #include "knot/modules/rosedb.h"
 #endif
@@ -237,6 +238,12 @@ static const yp_item_t desc_zone[] = {
 	{ NULL }
 };
 
+static const yp_item_t desc_stats[] = {
+	{ C_STATS_TIMER, YP_TINT,  YP_VINT = { 0, UINT32_MAX, 0, YP_STIME } },
+	{ NULL }
+};
+
+
 const yp_item_t conf_scheme[] = {
 	{ C_SRV,      YP_TGRP, YP_VGRP = { desc_server } },
 	{ C_CTL,      YP_TGRP, YP_VGRP = { desc_control } },
@@ -260,9 +267,11 @@ const yp_item_t conf_scheme[] = {
 	                                         { check_mod_dnstap } },
 #endif
 	{ C_MOD_ONLINE_SIGN,  YP_TGRP, YP_VGRP = { scheme_mod_online_sign }, YP_FMULTI },
+	{ C_MOD_QUERY_STATS,  YP_TGRP, YP_VGRP = { scheme_mod_query_stats }, YP_FMULTI },
 /***********/
 	{ C_TPL,      YP_TGRP, YP_VGRP = { desc_template }, YP_FMULTI, { check_template } },
 	{ C_ZONE,     YP_TGRP, YP_VGRP = { desc_zone }, YP_FMULTI, { check_zone } },
 	{ C_INCL,     YP_TSTR, YP_VNONE, YP_FNONE, { include_file } },
+	{ C_STATS,    YP_TGRP, YP_VGRP = { desc_stats } },
 	{ NULL }
 };

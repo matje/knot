@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 
 #include "libknot/errcode.h"
 #include "knot/common/log.h"
+#include "knot/common/stats.h"
 #include "knot/server/server.h"
 #include "knot/server/udp-handler.h"
 #include "knot/server/tcp-handler.h"
@@ -376,6 +377,8 @@ int server_init(server_t *server, int bg_workers)
 		return KNOT_ENOMEM;
 	}
 
+	global_stats_init(server);
+
 	return KNOT_EOK;
 }
 
@@ -396,6 +399,9 @@ void server_deinit(server_t *server)
 
 	/* Free threads and event handlers. */
 	worker_pool_destroy(server->workers);
+
+	/* Free statistics. */
+	deinit_global_stats(global_stats);
 
 	/* Free rate limits. */
 	rrl_destroy(server->rrl);
@@ -566,7 +572,6 @@ int server_reload(server_t *server, const char *cf, bool refresh_hostname)
 void server_stop(server_t *server)
 {
 	log_info("stopping server");
-
 	/* Stop scheduler. */
 	evsched_stop(&server->sched);
 	/* Interrupt background workers. */
@@ -675,6 +680,12 @@ void server_reconfigure(conf_t *conf, server_t *server)
 	if ((ret = reconfigure_sockets(conf, server)) < 0) {
 		log_error("failed to reconfigure server sockets (%s)",
 		          knot_strerror(ret));
+	}
+
+	/* Reconfigure statistics. */
+	if ((ret = reconfigure_statistics(conf)) < 0) {
+		log_warning("failed to reconfigure statistics (%s)",
+		            knot_strerror(ret));
 	}
 }
 

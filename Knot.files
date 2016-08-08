@@ -7,6 +7,7 @@ libtap/tap/float.c
 libtap/tap/float.h
 libtap/tap/macros.h
 src/contrib/asan.h
+src/contrib/atomic.h
 src/contrib/base32hex.c
 src/contrib/base32hex.h
 src/contrib/base64.c
@@ -207,6 +208,8 @@ src/knot/common/process.c
 src/knot/common/process.h
 src/knot/common/ref.c
 src/knot/common/ref.h
+src/knot/common/stats.c
+src/knot/common/stats.h
 src/knot/conf/base.c
 src/knot/conf/base.h
 src/knot/conf/conf.c
@@ -261,6 +264,8 @@ src/knot/modules/online_sign/module.c
 src/knot/modules/online_sign/module.h
 src/knot/modules/online_sign/nsec_next.c
 src/knot/modules/online_sign/nsec_next.h
+src/knot/modules/query_stats.c
+src/knot/modules/query_stats.h
 src/knot/modules/rosedb.c
 src/knot/modules/rosedb.h
 src/knot/modules/rosedb_tool.c
