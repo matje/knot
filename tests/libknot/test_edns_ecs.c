@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <netdb.h>
 
+#include "contrib/sockaddr.h"
 #include "libknot/errcode.h"
 #include "libknot/rrtype/opt.h"
 
@@ -204,6 +205,11 @@ static void test_set_address(void)
 	is_int(KNOT_ENOTSUP, r, "%s: UNIX not supported", __func__);
 }
 
+static bool sockaddr_eq(const struct sockaddr_storage *a, const struct sockaddr_storage *b)
+{
+	return sockaddr_cmp((struct sockaddr *)a, (struct sockaddr *)b) == 0;
+}
+
 static void test_get_address(void)
 {
 	struct test {
@@ -241,8 +247,7 @@ static void test_get_address(void)
 		if (t->expected == KNOT_EOK) {
 			struct sockaddr_storage addr = addr_init(t->addr_str);
 			assert(addr.ss_family != AF_UNSPEC);
-			valid = (r == t->expected &&
-				memcmp(&addr, &result, sizeof(addr)) == 0);
+			valid = (r == t->expected && sockaddr_eq(&result, &addr));
 		} else {
 			valid = (r == t->expected);
 		}
