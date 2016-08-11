@@ -193,7 +193,7 @@ static void print_edns_client_subnet(const uint8_t *data, const uint16_t len)
 	assert(ret == KNOT_EOK);
 
 	char addr_str[SOCKADDR_STRLEN] = { 0 };
-	sockaddr_tostr(addr_str, sizeof(addr_str), &addr);
+	sockaddr_tostr(addr_str, sizeof(addr_str), (struct sockaddr *)&addr);
 
 	printf("%s/%u/%u\n", addr_str, ecs.source_len, ecs.scope_len);
 }
