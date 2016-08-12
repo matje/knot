@@ -27,6 +27,20 @@
 extern "C" {
 #endif
 
+#ifndef TRIE_USE_QP
+    #define TRIE_USE_QP 1
+#endif
+
+#if TRIE_USE_QP
+
+typedef struct qp_trie hattrie_t;
+typedef struct qp_trie_it hattrie_iter_t;
+// dummy
+#define TRIE_BUCKET_SIZE (-1)
+#include "contrib/hhash.h"
+
+#else
+
 #include <stdlib.h>
 #include <stdbool.h>
 
@@ -43,58 +57,12 @@ struct knot_mm;
 #define TRIE_EOK          KNOT_EOK
 
 typedef struct hattrie_t_ hattrie_t;
-
-hattrie_t* hattrie_create (void);              //< Create an empty hat-trie.
-void       hattrie_free   (hattrie_t*);        //< Free all memory used by a trie.
-void       hattrie_clear  (hattrie_t*);        //< Remove all entries.
-size_t     hattrie_weight (const hattrie_t*);  //< Number of entries
-
-/** Create new trie with custom bucket size and memory management.
- */
-hattrie_t* hattrie_create_n (unsigned, const struct knot_mm *);
-
-/** Duplicate an existing trie.
- */
-hattrie_t* hattrie_dup (const hattrie_t*, value_t (*nval)(value_t));
-
-/** Build order index on all ahtable nodes in trie.
- */
-void hattrie_build_index (hattrie_t*);
-
-int hattrie_apply_rev (hattrie_t*, int (*f)(value_t*,void*), void* d);
-int hattrie_apply_rev_ahtable(hattrie_t* T, int (*f)(void*,void*), void* d);
-
-/** Find the given key in the trie, inserting it if it does not exist, and
- * returning a pointer to its key.
- *
- * This pointer is not guaranteed to be valid after additional calls to
- * hattrie_get, hattrie_del, hattrie_clear, or other functions that modifies the
- * trie.
- */
-value_t* hattrie_get (hattrie_t*, const char* key, size_t len);
-
-/** Find a given key in the table, returning a NULL pointer if it does not
- * exist. */
-value_t* hattrie_tryget (hattrie_t*, const char* key, size_t len);
-
-/** Find a given key in the table, returning a NULL pointer if it does not
- * exist. Also set prev to point to previous node. */
-int hattrie_find_leq (hattrie_t*, const char* key, size_t len, value_t** dst);
-/** Find a next value for given key, returning NULL if it does not exist. */
-int hattrie_find_next (hattrie_t* T, const char* key, size_t len, value_t **dst);
-
-/** Delete a given key from trie. Returns 0 if successful or -1 if not found.
- */
-int hattrie_del(hattrie_t* T, const char* key, size_t len);
-
 typedef struct hattrie_iter_t_ hattrie_iter_t;
 
-hattrie_iter_t* hattrie_iter_begin     (const hattrie_t*, bool sorted);
-void            hattrie_iter_next      (hattrie_iter_t*);
-bool            hattrie_iter_finished  (hattrie_iter_t*);
-void            hattrie_iter_free      (hattrie_iter_t*);
-const char*     hattrie_iter_key       (hattrie_iter_t*, size_t* len);
-value_t*        hattrie_iter_val       (hattrie_iter_t*);
+#endif // #if TRIE_USE_QP
+
+// the common part of interface
+#include "contrib/hat-trie/hat-api.h"
 
 #ifdef __cplusplus
 }

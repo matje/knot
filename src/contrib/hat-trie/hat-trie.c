@@ -1,3 +1,10 @@
+#include "contrib/hat-trie/hat-trie.h"
+
+#if TRIE_USE_QP
+    #include "contrib/qp-trie/qp.c"
+    #include "contrib/qp-trie/api-hat.c"
+#else
+
 /*
  * This file is part of hat-trie.
  *
@@ -9,7 +16,6 @@
 #include <assert.h>
 #include <string.h>
 #include "contrib/hhash.h"
-#include "contrib/hat-trie/hat-trie.h"
 #include "contrib/mempattern.h"
 #include "libknot/errcode.h"
 
@@ -1112,3 +1118,6 @@ value_t* hattrie_iter_val(hattrie_iter_t* i)
 
     return hhash_iter_val(i->i);
 }
+
+#endif
+
