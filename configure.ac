@@ -209,6 +209,9 @@ AC_ARG_ENABLE([systemd],
 
 AS_IF([test "$enable_daemon" = "yes"],[
 
+# libuv for tcp handler
+PKG_CHECK_MODULES([libuv], [libuv >= 1.2])
+
 AS_IF([test "$enable_systemd" != "no"],[
   AS_CASE([$enable_systemd],
     [auto],[PKG_CHECK_MODULES([systemd], [libsystemd], [enable_systemd=yes], [
@@ -555,6 +558,7 @@ AC_MSG_RESULT([
     Jansson:  ${jansson_LIBS} ${jansson_CFLAGS}
     Libedit:  ${libedit_LIBS} ${libedit_CFLAGS}
     LMDB:     ${enable_lmdb} ${lmdb_LIBS} ${lmdb_CFLAGS}
+    Libuv:    ${libuv_LIBS} ${libuv_CFLAGS}
 
     Sanitizer: ${sanitize_CFLAGS}
     LibFuzzer: ${libfuzzer_LIBS}
