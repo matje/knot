@@ -270,6 +270,7 @@ static int reconfigure_sockets(conf_t *conf, server_t *s)
 	/* Duplicate current list. */
 	/*! \note Pointers to addr, handlers etc. will be shared. */
 	if (s->ifaces) {
+		init_list(&s->ifaces->u);
 		list_dup(&s->ifaces->u, &s->ifaces->l, sizeof(iface_t));
 	}
 
@@ -297,6 +298,8 @@ static int reconfigure_sockets(conf_t *conf, server_t *s)
 		/* Found already bound interface. */
 		if (found_match) {
 			rem_node((node_t *)m);
+			add_tail(&newlist->l, (node_t *)m);
+			++bound;
 		} else {
 			char addr_str[SOCKADDR_STRLEN] = { 0 };
 			sockaddr_tostr(addr_str, sizeof(addr_str), (struct sockaddr *)&addr);
@@ -308,18 +311,16 @@ static int reconfigure_sockets(conf_t *conf, server_t *s)
 			if (server_init_iface(m, &addr, size) < 0) {
 				free(m);
 				m = 0;
+			} else {
+				add_tail(&newlist->u, (node_t *)m);
+				++bound;
 			}
 		}
-
-		/* Move to new list. */
-		if (m) {
-			add_tail(&newlist->l, (node_t *)m);
-			++bound;
-		}
-
 		conf_val_next(&listen_val);
 	}
 	free(rundir);
+
+	add_tail_list(&newlist->l, &newlist->u);
 
 	/* Wait for readers that are reconfiguring right now. */
 	/*! \note This subsystem will be reworked in #239 */
