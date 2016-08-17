@@ -36,6 +36,7 @@
 #define CMD_STATUS		"status"
 #define CMD_STOP		"stop"
 #define CMD_RELOAD		"reload"
+#define CMD_STATS		"stats"
 
 #define CMD_ZONE_CHECK		"zone-check"
 #define CMD_ZONE_MEMSTATS	"zone-memstats"
@@ -45,6 +46,7 @@
 #define CMD_ZONE_RETRANSFER	"zone-retransfer"
 #define CMD_ZONE_FLUSH		"zone-flush"
 #define CMD_ZONE_SIGN		"zone-sign"
+#define CMD_ZONE_STATS		"zone-stats"
 
 #define CMD_ZONE_READ		"zone-read"
 #define CMD_ZONE_BEGIN		"zone-begin"
@@ -289,6 +291,32 @@ static void format_data(ctl_cmd_t cmd, knot_ctl_type_t data_type,
 			printf(" %s", value);
 		}
 		break;
+	case CTL_ZONE_STATS:
+	case CTL_STATS:
+		if (data_type == KNOT_CTL_TYPE_DATA) {
+			printf("%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+				(!(*empty)     ? "\n"       : ""),
+				(error != NULL ? "error: (" : ""),
+				(error != NULL ? error      : ""),
+				(error != NULL ? ") "       : ""),
+				(zone  != NULL ? "["        : ""),
+				(zone  != NULL ? zone       : ""),
+				(zone  != NULL ? "] "       : ""),
+				(type  != NULL ? type       : ""),
+				(type  != NULL ? "."        : ""),
+				(key0  != NULL ? key0       : ""),
+				(id    != NULL ? "["        : ""),
+				(id    != NULL ? id         : ""),
+				(id    != NULL ? "]"        : ""),
+				(key1  != NULL ? "."        : ""),
+				(key1  != NULL ? key1       : ""),
+				(value != NULL ? " = "       : ""));
+			*empty = false;
+		}
+		if (value != NULL) {
+			printf(" %s", value);
+		}
+		break;
 	default:
 		assert(0);
 	}
@@ -331,6 +359,8 @@ static void format_block(ctl_cmd_t cmd, bool failed, bool empty)
 	case CTL_CONF_READ:
 	case CTL_CONF_DIFF:
 	case CTL_CONF_GET:
+	case CTL_ZONE_STATS:
+	case CTL_STATS:
 		printf("%s", empty ? "" : "\n");
 		break;
 	default:
@@ -390,6 +420,76 @@ static int cmd_ctl(cmd_args_t *args)
 	};
 
 	// Send the command.
+	ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &data);
+	if (ret != KNOT_EOK) {
+		log_error(CTL_LOG_STR" (%s)", knot_strerror(ret));
+		return ret;
+	}
+
+	// Finish the input block.
+	ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_BLOCK, NULL);
+	if (ret != KNOT_EOK) {
+		log_error(CTL_LOG_STR" (%s)", knot_strerror(ret));
+		return ret;
+	}
+
+	return ctl_receive(args);
+}
+
+static int set_stats_items(cmd_args_t *args, knot_ctl_data_t *data)
+{
+	int min_args, max_args;
+	switch (args->desc->cmd) {
+	case CTL_STATS:   min_args = 0; max_args =  2; break;
+	case CTL_ZONE_STATS:  min_args = 0; max_args =  3; break;
+	default:
+		assert(0);
+		return KNOT_EINVAL;
+	}
+
+	// Check the number of arguments.
+	int ret = check_args(args, min_args, max_args);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+	int idx = 0;
+
+	if (args->argc == 0) {
+		goto end;
+	}
+	// Set ZONE name.
+	if (args->desc->cmd == CTL_ZONE_STATS) {
+		if (strcmp(args->argv[idx], "--") != 0) {
+			(*data)[KNOT_CTL_IDX_ZONE] = args->argv[idx];
+		}
+		idx++;
+	}
+	end:
+	    if (args->argc > idx) {
+		    (*data)[KNOT_CTL_IDX_SECTION] = args->argv[idx];
+		    idx++;
+	    }
+
+	    if (args->argc > idx) {
+		    (*data)[KNOT_CTL_IDX_ITEM] = args->argv[idx];
+		    idx++;
+	    }
+
+	    return KNOT_EOK;
+}
+
+static int cmd_stats_ctl(cmd_args_t *args)
+{
+	knot_ctl_data_t data = {
+		[KNOT_CTL_IDX_CMD] = ctl_cmd_to_str(args->desc->cmd),
+		[KNOT_CTL_IDX_FLAGS] = args->force ? CTL_FLAG_FORCE : NULL
+	};
+
+	int ret = set_stats_items(args, &data);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
 	ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &data);
 	if (ret != KNOT_EOK) {
 		log_error(CTL_LOG_STR" (%s)", knot_strerror(ret));
@@ -867,6 +967,9 @@ const cmd_desc_t cmd_table[] = {
 	{ CMD_STOP,            cmd_ctl,           CTL_STOP },
 	{ CMD_RELOAD,          cmd_ctl,           CTL_RELOAD },
 
+	{ CMD_STATS,           cmd_stats_ctl,	  CTL_STATS },
+	{ CMD_ZONE_STATS,      cmd_stats_ctl,	  CTL_ZONE_STATS,      CMD_FOPT_ZONE },
+
 	{ CMD_ZONE_CHECK,      cmd_zone_check,    CTL_NONE,            CMD_FOPT_ZONE | CMD_FREAD },
 	{ CMD_ZONE_MEMSTATS,   cmd_zone_memstats, CTL_NONE,            CMD_FOPT_ZONE | CMD_FREAD },
 	{ CMD_ZONE_STATUS,     cmd_zone_ctl,      CTL_ZONE_STATUS,     CMD_FOPT_ZONE },
@@ -939,6 +1042,10 @@ static const cmd_help_t cmd_help_table[] = {
 	{ CMD_CONF_GET,        "[<item>...]",                            "Get the item data within the transaction." },
 	{ CMD_CONF_SET,        " <item>  [<data>...]",                   "Set the item data within the transaction." },
 	{ CMD_CONF_UNSET,      "[<item>] [<data>...]",                   "Unset the item data within the transaction." },
+	{ "",                  "",                                       "" },
+	{ "statistics:",       "[<block>] | [<counter>]  [<request | response>[<index>]]",     "" },
+	{ CMD_STATS,           "[<statistics>]",			 "Show global statistics if configured." },
+	{ CMD_ZONE_STATS,      "[<zone> [<statistics>]]",                "Show statistics of all configured zones."},
 	{ NULL }
 };
 

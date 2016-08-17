@@ -18,6 +18,7 @@
 #include <urcu.h>
 
 #include "knot/common/log.h"
+#include "knot/common/stats.h"
 #include "knot/conf/confio.h"
 #include "knot/ctl/commands.h"
 #include "knot/updates/zone-update.h"
@@ -27,6 +28,8 @@
 #include "contrib/mempattern.h"
 #include "contrib/string.h"
 #include "zscanner/scanner.h"
+
+#include "knot/modules/query_stats.h"
 
 void ctl_log_data(knot_ctl_data_t *data)
 {
@@ -903,6 +906,224 @@ static int zone_txn_unset(zone_t *zone, ctl_args_t *args)
 
 }
 
+/*!
+ * \brief Check if string is name of block
+ * \param name Name to be checked
+ * \param beg If block - begining saved here
+ * \param end If block - end saved here
+ * \return Return 1 if block. Return 0 if not a block.
+ */
+static int is_block(const char *name, int *beg, int *end)
+{
+	for (int a = 0; a < blocks_count(); a++) {
+		ctr_block_t block = get_block(a);
+		if (!strcmp(name, block.description)) {
+			*beg = block.begin;
+			*end = block.end;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int is_counter(const char *name, int *index)
+{
+	for (int a = 1; a < counters_max_index(); a++) {
+		if (strcmp(name, get_descriptions(a)) == 0) {
+			*index = a;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*!
+ * \brief Send counters to client.
+ * \param args Specifying arguments.
+ * \param name Zone name.
+ * \param beg Index to start at.
+ * \param end Index to end at (included).
+ * \param data Data source.
+ */
+static int counters(ctl_args_t *args, char *name, int beg, int end, query_stats_t *data)
+{
+	ctr_block_t block;
+	int a = 0;
+	do {
+		block = get_block(a);
+		a++;
+	} while (block.begin < beg && a < blocks_count());
+
+	for (int i = beg; i <= end; i++) {
+		char valbuff[21]; // size of max uint64 value + 1
+		snprintf(valbuff, sizeof(valbuff), "%ld", data->counters[i]);
+		knot_ctl_data_t msg = {
+			[KNOT_CTL_IDX_ZONE] = name,
+			[KNOT_CTL_IDX_TYPE] = block.description,
+			[KNOT_CTL_IDX_DATA] = valbuff,
+			[KNOT_CTL_IDX_SECTION] = get_descriptions(i),
+		};
+		int ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &msg);
+		if (ret != KNOT_EOK) {
+			return ret;
+		}
+		if (block.end == i) {
+			if (a >= blocks_count()) {
+				block.description = "";
+			} else {
+				block = get_block(a);
+				a++;
+			}
+		}
+	}
+	return KNOT_EOK;
+}
+
+/*!
+ * \brief Send statistics from request_size or response_size.
+ * \param args Specifying arguments.
+ * \param name Zone name.
+ * \param source To determine if request or response
+ * \param beg Index to start at.
+ * \param end Index to end at (included).
+ * \param data Data source.
+ */
+static int req_res(ctl_args_t *args, char *name, const char *source, int beg, int end,
+		    query_stats_t *data)
+{
+	for (int i = beg; i <= end; i++) {
+		char buff[21]; // size of max uint64 value + 1
+		char buff_index[11]; // size of max int value +1
+		if (strcmp(source, "request_size") == 0) {
+			snprintf(buff, sizeof(buff), "%ld", data->request_size[i]);
+		}
+		else if (strcmp(source, "response_size") == 0){
+			snprintf(buff, sizeof(buff), "%ld", data->response_size[i]);
+		}
+		snprintf(buff_index, sizeof(buff_index), "%d", i);
+		knot_ctl_data_t msg = {
+			[KNOT_CTL_IDX_ZONE] = name,
+			[KNOT_CTL_IDX_DATA] = buff,
+			[KNOT_CTL_IDX_SECTION] = source,
+			[KNOT_CTL_IDX_ID] = buff_index,
+		};
+		int ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &msg);
+		if (ret != KNOT_EOK) {
+			return ret;
+		}
+	}
+	return KNOT_EOK;
+}
+
+/*!
+ * \brief Converting string to long (positive only).
+ * \return Converted value or negative number.
+ */
+static long str_to_numb(const char *str)
+{
+	errno = 0;
+	char *endptr;
+	if (str == NULL) {
+		return KNOT_EINVAL;
+	}
+	// Convert and check all unvanted cases
+	long val = strtol(str, &endptr, 10);
+	if (errno == ERANGE || errno != 0 || *endptr != '\0' || val > 2147483647
+		|| val < 0) {
+		return KNOT_EINVAL;
+	}
+	return val;
+}
+
+/*!
+ * \brief Process arguments and send corresponding data to client
+ * \param data Data source.
+ * \param args Arguments source.
+ * \param name Zone name.
+ */
+static int _stats_process(query_stats_t *data, ctl_args_t *args, char *name)
+{
+	const char *key0 = args->data[KNOT_CTL_IDX_SECTION];
+	const char *key1 = args->data[KNOT_CTL_IDX_ITEM];
+	if (data == NULL) {
+		return KNOT_EINVAL;
+	}
+	if (!key0) {
+		counters(args, name, ctr_none+1,counters_max_index(), data);
+		req_res(args, name, "request_size", 0, HIST_REQUEST-1, data);
+		req_res(args, name, "response_size",0, HIST_RESPONSE-1, data);
+		return KNOT_EOK;
+	}
+
+	long tmp_index = str_to_numb(key1);
+	int beg, end, index;
+	if (is_block(key0, &beg, &end)) {
+		counters(args, name, beg, end, data);
+	// If didnt ask for block, check if asked for counter
+	} else if (is_counter(key0, &index)) {
+		counters(args, name, index, index, data);
+	} else if (strcmp(key0, "request_size") == 0) {
+		if (key1 == NULL) {
+			req_res(args, name, key0, 0, HIST_REQUEST-1, data);
+		} else if (tmp_index == KNOT_EINVAL) {
+			goto invalid;
+		} else {
+			if (tmp_index >= HIST_REQUEST) {
+				index = HIST_REQUEST-1;
+			} else {
+				index = (int)tmp_index;
+			}
+			req_res(args, name, key0, index, index, data);
+		}
+	} else if (strcmp(key0, "response_size") == 0) {
+		if (key1 == NULL) {
+			req_res(args, name, key0, 0, HIST_RESPONSE-1, data);
+		} else if (tmp_index == KNOT_EINVAL) {
+			goto invalid;
+		} else {
+			if (tmp_index >= HIST_RESPONSE) {
+				index = HIST_RESPONSE -1;
+			} else {
+				index = (int)tmp_index;
+			}
+			req_res(args, name, key0, index, index, data);
+		}
+	} else {
+	invalid: ;
+		knot_ctl_data_t msg = {
+			[KNOT_CTL_IDX_ERROR] = "invalid command",
+		};
+		int ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &msg);
+		if (ret != KNOT_EOK) {
+			return ret;
+		}
+	}
+	return KNOT_EOK;
+}
+
+/*!
+ * \brief Send statistics from given zone to client and save into a file.
+ */
+static int zone_stats(zone_t *zone, ctl_args_t *args)
+{
+	zone_stats_dump(zone);
+	char name[KNOT_DNAME_TXT_MAXLEN + 1];
+	if (knot_dname_to_str(name, zone->name, sizeof(name)) == NULL) {
+		return KNOT_EINVAL;
+	}
+	query_stats_t *data = get_query_stats_from_module(zone->query_modules);
+	return _stats_process(data, args, name);
+}
+
+/*!
+ * \brief Send global statistics to client and save into a file.
+ */
+static int stats_show(ctl_args_t *args)
+{
+	global_stats_dump();
+	return _stats_process(global_stats->query_stats, args, NULL);
+}
+
 static int ctl_zone(ctl_args_t *args, ctl_cmd_t cmd)
 {
 	switch (cmd) {
@@ -934,6 +1155,8 @@ static int ctl_zone(ctl_args_t *args, ctl_cmd_t cmd)
 		return zones_apply(args, zone_txn_set);
 	case CTL_ZONE_UNSET:
 		return zones_apply(args, zone_txn_unset);
+	case CTL_ZONE_STATS:
+		return zones_apply(args, zone_stats);
 	default:
 		assert(0);
 		return KNOT_EINVAL;
@@ -963,6 +1186,16 @@ static int ctl_server(ctl_args_t *args, ctl_cmd_t cmd)
 	}
 
 	return ret;
+}
+
+static int ctl_stats(ctl_args_t *args, ctl_cmd_t cmd)
+{
+	assert(cmd == CTL_STATS);
+	int ret = stats_show(args);
+	if (ret != KNOT_EOK) {
+		send_error(args, knot_strerror(ret));
+	}
+	return KNOT_EOK;
 }
 
 static int send_block_data(conf_io_t *io, knot_ctl_data_t *data)
@@ -1233,6 +1466,7 @@ static const desc_t cmd_table[] = {
 	[CTL_STATUS]          = { "status",          ctl_server },
 	[CTL_STOP]            = { "stop",            ctl_server },
 	[CTL_RELOAD]          = { "reload",          ctl_server },
+	[CTL_STATS]           = { "stats",           ctl_stats },
 
 	[CTL_ZONE_STATUS]     = { "zone-status",     ctl_zone },
 	[CTL_ZONE_RELOAD]     = { "zone-reload",     ctl_zone },
@@ -1249,6 +1483,7 @@ static const desc_t cmd_table[] = {
 	[CTL_ZONE_GET]        = { "zone-get",        ctl_zone },
 	[CTL_ZONE_SET]        = { "zone-set",        ctl_zone },
 	[CTL_ZONE_UNSET]      = { "zone-unset",      ctl_zone },
+	[CTL_ZONE_STATS]      = { "zone-stats",	     ctl_zone },
 
 	[CTL_CONF_LIST]       = { "conf-list",       ctl_conf_read },
 	[CTL_CONF_READ]       = { "conf-read",       ctl_conf_read },
