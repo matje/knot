@@ -77,6 +77,7 @@ typedef struct {
 typedef struct {
 	query_stats_t *query_stats;
 	pthread_t dump_handler;
+	int thread_state;
 	uint32_t dump_timer;
 } stats_t;
 
@@ -85,7 +86,7 @@ extern stats_t *global_stats;
 
 int counters_max_index(void);
 int blocks_count(void);
-char *get_descriptions(int index);
+const char *get_descriptions(int index);
 ctr_block_t get_block(int index);
 
 query_stats_t *get_query_stats_from_module(list_t query_modules);
@@ -151,9 +152,9 @@ stats_t *init_global_stats(void);
  * \brief Set up global statistics
  * \param server
  */
-void global_stats_init(server_t *server);
+void global_stats_init(void);
 
-int reconfigure_statistics(conf_t *conf);
+int reconfigure_statistics(conf_t *conf, server_t *server);
 
 /*!
  * \brief Destroy query_stats_t structure

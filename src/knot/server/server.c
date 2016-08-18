@@ -377,8 +377,6 @@ int server_init(server_t *server, int bg_workers)
 		return KNOT_ENOMEM;
 	}
 
-	global_stats_init(server);
-
 	return KNOT_EOK;
 }
 
@@ -683,7 +681,7 @@ void server_reconfigure(conf_t *conf, server_t *server)
 	}
 
 	/* Reconfigure statistics. */
-	if ((ret = reconfigure_statistics(conf)) < 0) {
+	if ((ret = reconfigure_statistics(conf, server)) < 0) {
 		log_warning("failed to reconfigure statistics (%s)",
 		            knot_strerror(ret));
 	}

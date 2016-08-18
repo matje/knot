@@ -956,14 +956,17 @@ static int counters(ctl_args_t *args, char *name, int beg, int end, query_stats_
 
 	for (int i = beg; i <= end; i++) {
 		char valbuff[21]; // size of max uint64 value + 1
-		snprintf(valbuff, sizeof(valbuff), "%ld", data->counters[i]);
+		int ret = snprintf(valbuff, sizeof(valbuff), "%ld", data->counters[i]);
+		if (ret <= 0 || ret >= sizeof(valbuff)) {
+			return KNOT_ESPACE;
+		}
 		knot_ctl_data_t msg = {
 			[KNOT_CTL_IDX_ZONE] = name,
 			[KNOT_CTL_IDX_TYPE] = block.description,
 			[KNOT_CTL_IDX_DATA] = valbuff,
 			[KNOT_CTL_IDX_SECTION] = get_descriptions(i),
 		};
-		int ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &msg);
+		ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &msg);
 		if (ret != KNOT_EOK) {
 			return ret;
 		}
@@ -994,20 +997,30 @@ static int req_res(ctl_args_t *args, char *name, const char *source, int beg, in
 	for (int i = beg; i <= end; i++) {
 		char buff[21]; // size of max uint64 value + 1
 		char buff_index[11]; // size of max int value +1
+		int ret;
 		if (strcmp(source, "request_size") == 0) {
-			snprintf(buff, sizeof(buff), "%ld", data->request_size[i]);
+			ret = snprintf(buff, sizeof(buff), "%ld", data->request_size[i]);
+			if (ret <= 0 || ret >= sizeof(buff)) {
+				return KNOT_ESPACE;
+			}
 		}
 		else if (strcmp(source, "response_size") == 0){
-			snprintf(buff, sizeof(buff), "%ld", data->response_size[i]);
+			ret = snprintf(buff, sizeof(buff), "%ld", data->response_size[i]);
+			if (ret <= 0 || ret >= sizeof(buff)) {
+				return KNOT_ESPACE;
+			}
 		}
-		snprintf(buff_index, sizeof(buff_index), "%d", i);
+		ret = snprintf(buff_index, sizeof(buff_index), "%d", i);
+		if (ret <= 0 || ret >= sizeof(buff_index)) {
+			return KNOT_ESPACE;
+		}
 		knot_ctl_data_t msg = {
 			[KNOT_CTL_IDX_ZONE] = name,
 			[KNOT_CTL_IDX_DATA] = buff,
 			[KNOT_CTL_IDX_SECTION] = source,
 			[KNOT_CTL_IDX_ID] = buff_index,
 		};
-		int ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &msg);
+		ret = knot_ctl_send(args->ctl, KNOT_CTL_TYPE_DATA, &msg);
 		if (ret != KNOT_EOK) {
 			return ret;
 		}

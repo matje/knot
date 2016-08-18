@@ -208,7 +208,7 @@ static void stats_init(struct query_module *self, struct query_stats_ctx *qsc,
 int query_stats_load(struct query_plan *plan, struct query_module *self,
                      const knot_dname_t *zone)
 {
-	struct query_stats_ctx *qsc = mm_alloc(self->mm, sizeof(struct query_stats_ctx));
+	struct query_stats_ctx *qsc = mm_alloc(self->mm, sizeof(*qsc));
 	if (qsc == NULL) {
 		MODULE_ERR(C_MOD_QUERY_STATS, "not enough memory");
 		return KNOT_ENOMEM;
@@ -228,10 +228,11 @@ int query_stats_load(struct query_plan *plan, struct query_module *self,
 int query_stats_unload(struct query_module *self)
 {
 	struct query_stats_ctx *qsc = self->ctx;
-	if (!qsc->zone_name) {
+	if (qsc->zone_name == NULL) {
 		qsc->data = NULL;
+	} else {
+		deinit_query_stats(qsc->data);
 	}
-	mm_free(self->mm, self->ctx);
 	return KNOT_EOK;
 }
 
