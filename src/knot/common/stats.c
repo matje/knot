@@ -14,7 +14,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "time.h"
+#include <time.h>
+#include <urcu.h>
 
 #include "knot/common/stats.h"
 #include "knot/common/log.h"
@@ -168,7 +169,7 @@ static int stats_save(query_stats_t *qdata, char *scope)
 	FILE *output = NULL;
 	// Open temporary file to replace old record with new
 	char tmp_pathname[strlen(qdata->file) + 2];
-	if (qdata->srec) {
+	if (qdata->single_record) {
 		snprintf(tmp_pathname,sizeof(tmp_pathname),"%s~" , qdata->file);
 		output = fopen(tmp_pathname, "w");
 	}
@@ -198,7 +199,7 @@ static int stats_save(query_stats_t *qdata, char *scope)
 
 	fclose(output);
 	// Atomic record replacement
-	if (qdata->srec){
+	if (qdata->single_record) {
 		rename(tmp_pathname, qdata->file);
 	}
 
@@ -226,19 +227,11 @@ static inline struct query_module *find_stats_module(list_t query_modules)
 
 query_stats_t *get_query_stats_from_module(list_t query_modules)
 {
-	struct query_module *qm = find_stats_module(query_modules);
-	if (qm != NULL) {
-		return get_query_stats(qm);
-	}
-	else return NULL;
-}
-
-void stats_dump(knot_zonedb_t *db)
-{
-	global_stats_dump();
-
-	if (db != NULL) {
-		knot_zonedb_foreach(db, zone_stats_dump);
+	struct query_module *module = find_stats_module(query_modules);
+	if (module != NULL) {
+		return get_query_stats(module);
+	} else {
+		return NULL;
 	}
 }
 
@@ -254,7 +247,7 @@ void zone_stats_dump(zone_t *zone)
 		int ret;
 		if ((ret = stats_save(qstats, name)) != KNOT_EOK) {
 			log_warning("Writing statistics into a file failed with %d for zone %s",
-				    ret, name);
+			            ret, name);
 		} else {
 			log_info("%s stats dumped to file '%s'", name, qstats->file);
 		}
@@ -278,6 +271,29 @@ void global_stats_dump(void)
 	}
 }
 
+static void *dumper(void *ctx)
+{
+	if (global_stats == NULL) {
+		return NULL;
+	}
+
+	server_t *server = ctx;
+	while (1) {
+		global_stats_dump();
+		if (server->zone_db != NULL) {
+			rcu_read_lock();
+			knot_zonedb_foreach(server->zone_db, zone_stats_dump);
+			rcu_read_unlock();
+		}
+		if (global_stats->dump_timer == 0) {
+			break;
+		}
+		sleep(global_stats->dump_timer);
+	}
+
+	return NULL;
+}
+
 query_stats_t *init_query_stats(void)
 {
 	query_stats_t *stats = malloc(sizeof(*stats));
@@ -293,8 +309,8 @@ query_stats_t *init_query_stats(void)
 	}
 
 	stats->query = 0;
-	stats->save_all = 0;
-	stats->srec = 0;
+	stats->save_all = false;
+	stats->single_record = false;
 
 	memset(stats->request_size,  0, HIST_REQUEST  * sizeof(knot_atomic_t));
 	memset(stats->response_size, 0, HIST_RESPONSE * sizeof(knot_atomic_t));
@@ -302,68 +318,6 @@ query_stats_t *init_query_stats(void)
 	stats->file = NULL;
 
 	return stats;
-}
-
-stats_t *init_global_stats(void)
-{
-	stats_t *stats = malloc(sizeof(*stats));
-	if (stats == NULL) {
-		log_warning("failed to allocate memory");
-		return NULL;
-	}
-
-	stats->query_stats = NULL;
-	stats->dump_timer = 0;
-	stats->thread_state = 0;
-
-	return stats;
-}
-
-static void *dumper(void *server)
-{
-	server_t *serv = server;
-	while (1) {
-		if (global_stats != NULL && global_stats->dump_timer > 0) {
-			stats_dump(serv->zone_db);
-			sleep(global_stats->dump_timer);
-		}
-	}
-
-	return NULL;
-}
-
-void global_stats_init()
-{
-	if (global_stats == NULL) {
-		global_stats = init_global_stats();
-	}
-
-	if (global_stats != NULL && global_stats->query_stats == NULL) {
-		global_stats->query_stats = init_query_stats();
-	}
-}
-
-int reconfigure_statistics(conf_t *conf, server_t *server)
-{
-	global_stats_init();
-	conf_val_t val = conf_get(conf, C_STATS, C_STATS_TIMER);
-	global_stats->dump_timer = conf_int(&val);
-	if (global_stats->dump_timer > 0) {
-		if(!global_stats->thread_state) {
-			int ret = pthread_create(&global_stats->dump_handler, NULL, dumper, server);
-			if (ret != 0) {
-				log_warning("Failed to create a thread for statistics.");
-			} else {
-				global_stats->thread_state = 1;
-			}
-		}
-	} else if (global_stats->thread_state) {
-		pthread_cancel(global_stats->dump_handler);
-		pthread_join(global_stats->dump_handler, NULL);
-		global_stats->thread_state = 0;
-	}
-
-	return KNOT_EOK;
 }
 
 void deinit_query_stats(query_stats_t *stats)
@@ -384,21 +338,54 @@ void deinit_query_stats(query_stats_t *stats)
 	stats = NULL;
 }
 
-void deinit_global_stats(stats_t *stats)
+int stats_reconfigure(conf_t *conf, server_t *server)
 {
-	if (stats == NULL) {
+	if (global_stats == NULL) {
+		global_stats = malloc(sizeof(*global_stats));
+		if (global_stats == NULL) {
+			return KNOT_ENOMEM;
+		}
+		memset(global_stats, 0, sizeof(*global_stats));
+	}
+
+	global_stats->dump_timer = 0;
+	conf_val_t val = conf_get(conf, C_STATS, C_STATS_TIMER);
+	int64_t timer = conf_int(&val);
+	if (timer != YP_NIL) {
+		global_stats->dump_timer = timer;
+		if (!global_stats->active_thread) {
+			int ret = pthread_create(&global_stats->dump_handler,
+			                         NULL, dumper, server);
+			if (ret != 0) {
+				log_warning("Failed to create a thread for statistics.");
+			} else {
+				global_stats->active_thread = false;
+			}
+		}
+	} else if (global_stats->active_thread) {
+		pthread_cancel(global_stats->dump_handler);
+		pthread_join(global_stats->dump_handler, NULL);
+		global_stats->active_thread = false;
+	}
+
+	return KNOT_EOK;
+}
+
+void stats_deinit(void)
+{
+	if (global_stats == NULL) {
 		return;
 	}
 
-	if (stats->thread_state) {
-		pthread_cancel(stats->dump_handler);
-		pthread_join(stats->dump_handler, NULL);
+	if (global_stats->active_thread) {
+		pthread_cancel(global_stats->dump_handler);
+		pthread_join(global_stats->dump_handler, NULL);
 	}
 
-	if (stats->query_stats != NULL) {
-		deinit_query_stats(stats->query_stats);
+	if (global_stats->query_stats != NULL) {
+		deinit_query_stats(global_stats->query_stats);
 	}
 
-	free(stats);
-	stats = NULL;
+	free(global_stats);
+	global_stats = NULL;
 }

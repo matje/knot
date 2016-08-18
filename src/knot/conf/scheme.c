@@ -239,7 +239,7 @@ static const yp_item_t desc_zone[] = {
 };
 
 static const yp_item_t desc_stats[] = {
-	{ C_STATS_TIMER, YP_TINT,  YP_VINT = { 0, UINT32_MAX, 0, YP_STIME } },
+	{ C_STATS_TIMER, YP_TINT,  YP_VINT = { 1, UINT32_MAX, YP_NIL, YP_STIME } },
 	{ NULL }
 };
 
@@ -247,6 +247,7 @@ static const yp_item_t desc_stats[] = {
 const yp_item_t conf_scheme[] = {
 	{ C_SRV,      YP_TGRP, YP_VGRP = { desc_server } },
 	{ C_CTL,      YP_TGRP, YP_VGRP = { desc_control } },
+	{ C_STATS,    YP_TGRP, YP_VGRP = { desc_stats } },
 	{ C_LOG,      YP_TGRP, YP_VGRP = { desc_log }, YP_FMULTI },
 	{ C_KEYSTORE, YP_TGRP, YP_VGRP = { desc_keystore }, YP_FMULTI, { check_keystore } },
 	{ C_POLICY,   YP_TGRP, YP_VGRP = { desc_policy }, YP_FMULTI, { check_policy } },
@@ -272,6 +273,5 @@ const yp_item_t conf_scheme[] = {
 	{ C_TPL,      YP_TGRP, YP_VGRP = { desc_template }, YP_FMULTI, { check_template } },
 	{ C_ZONE,     YP_TGRP, YP_VGRP = { desc_zone }, YP_FMULTI, { check_zone } },
 	{ C_INCL,     YP_TSTR, YP_VNONE, YP_FNONE, { include_file } },
-	{ C_STATS,    YP_TGRP, YP_VGRP = { desc_stats } },
 	{ NULL }
 };

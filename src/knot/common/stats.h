@@ -70,14 +70,14 @@ typedef struct {
 	knot_atomic_t request_size[HIST_REQUEST];
 	knot_atomic_t response_size[HIST_RESPONSE];
 	char *file;
-	int save_all;
-	int srec;
+	bool save_all;
+	bool single_record;
 } query_stats_t;
 
 typedef struct {
 	query_stats_t *query_stats;
+	bool active_thread;
 	pthread_t dump_handler;
-	int thread_state;
 	uint32_t dump_timer;
 } stats_t;
 
@@ -90,12 +90,6 @@ const char *get_descriptions(int index);
 ctr_block_t get_block(int index);
 
 query_stats_t *get_query_stats_from_module(list_t query_modules);
-
-/*!
- * \brief Dump function for all statistics
- * \param db Structure containing zones
- */
-void stats_dump(knot_zonedb_t *db);
 
 /*!
  * \brief Save statistics of specific zone.
@@ -143,27 +137,16 @@ static inline void stats_sub(counter_t ctr, unsigned int val)
 query_stats_t *init_query_stats(void);
 
 /*!
- * \brief Inicialize global stats structure
- * \return Inicialized structure
- */
-stats_t *init_global_stats(void);
-
-/*!
- * \brief Set up global statistics
- * \param server
- */
-void global_stats_init(void);
-
-int reconfigure_statistics(conf_t *conf, server_t *server);
-
-/*!
  * \brief Destroy query_stats_t structure
  * \param stats  Structure to be deinitialized
  */
 void deinit_query_stats(query_stats_t *stats);
 
+int stats_reconfigure(conf_t *conf, server_t *server);
+
 /*!
  * \brief Destroy stats_t structure
  * \param stats  Structure to be deinitialized
  */
-void deinit_global_stats(stats_t *stats);
+void stats_deinit(void);
+

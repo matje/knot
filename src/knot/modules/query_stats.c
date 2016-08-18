@@ -24,15 +24,15 @@
 
 /* Module configuration scheme. */
 #define MOD_FILE	"\x04""file"
-#define MOD_SING_REC	"\x0D""single-record"
+#define MOD_SINGLE_REC	"\x0D""single-record"
 #define MOD_SAVE_ALL	"\x08""save-all"
 
 const yp_item_t scheme_mod_query_stats[] = {
-	{ C_ID,         YP_TSTR, YP_VNONE },
-	{ MOD_FILE,     YP_TSTR, YP_VSTR = {"knot.stats"} },
-	{ MOD_SING_REC, YP_TBOOL, YP_VNONE },
-	{ MOD_SAVE_ALL, YP_TBOOL, YP_VNONE },
-	{ C_COMMENT,    YP_TSTR, YP_VNONE },
+	{ C_ID,           YP_TSTR, YP_VNONE },
+	{ MOD_FILE,       YP_TSTR, YP_VSTR = {"knot.stats"} },
+	{ MOD_SINGLE_REC, YP_TBOOL, YP_VNONE },
+	{ MOD_SAVE_ALL,   YP_TBOOL, YP_VNONE },
+	{ C_COMMENT,      YP_TSTR, YP_VNONE },
 	{ NULL }
 };
 
@@ -159,49 +159,43 @@ static void stats_save_param(struct query_module *self, struct query_stats_ctx *
 {
 	// Save all?
 	conf_val_t val = conf_mod_get(self->config, MOD_SAVE_ALL, self->id);
-	if (conf_bool(&val)) {
-		qsc->data->save_all = 1;
-	} else {
-		qsc->data->save_all = 0;
-	}
+	qsc->data->save_all = conf_bool(&val);
 
 	// One record?
-	val = conf_mod_get(self->config, MOD_SING_REC, self->id);
-	if (conf_bool(&val)) {
-		qsc->data->srec = 1;
-	} else {
-		qsc->data->srec = 0;
-	}
+	val = conf_mod_get(self->config, MOD_SINGLE_REC, self->id);
+	qsc->data->single_record = conf_bool(&val);
 }
 
 static void stats_file_name(struct query_module *self, struct query_stats_ctx *qsc)
 {
-	// Get file to write to
+	// Get file to write to.
 	conf_val_t val = conf_mod_get(self->config, MOD_FILE, self->id);
 	if (val.code == KNOT_EOK) {
 		qsc->data->file = strdup(conf_str(&val));
 	} else {
-	// if default, force appending by wiping onerecord flag
-		qsc->data->srec = 1;
+	// If default, force appending by wiping one-record flag.
+		qsc->data->single_record = true;
 	}
 }
 
 static void stats_init(struct query_module *self, struct query_stats_ctx *qsc,
 		       const knot_dname_t *zone)
 {
-	// if global module - use global structure, else init new
+	// If global module, use global structure, else init new.
 	if (zone == NULL) {
-		if (global_stats == NULL) {
-			global_stats = init_global_stats();
-		}
+		assert(global_stats);
 		if (global_stats->query_stats == NULL) {
 			global_stats->query_stats = init_query_stats();
 		}
 		qsc->data = global_stats->query_stats;
 		qsc->zone_name = NULL;
-	} else { // If zone specific - create new
+	} else { // If zone specific, create new.
 		qsc->data = init_query_stats();
 		qsc->zone_name = zone;
+	}
+
+	if (qsc->data == NULL) {
+		// TODO
 	}
 }
 

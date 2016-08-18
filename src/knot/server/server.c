@@ -399,7 +399,7 @@ void server_deinit(server_t *server)
 	worker_pool_destroy(server->workers);
 
 	/* Free statistics. */
-	deinit_global_stats(global_stats);
+	stats_deinit();
 
 	/* Free rate limits. */
 	rrl_destroy(server->rrl);
@@ -681,7 +681,7 @@ void server_reconfigure(conf_t *conf, server_t *server)
 	}
 
 	/* Reconfigure statistics. */
-	if ((ret = reconfigure_statistics(conf, server)) < 0) {
+	if ((ret = stats_reconfigure(conf, server)) < 0) {
 		log_warning("failed to reconfigure statistics (%s)",
 		            knot_strerror(ret));
 	}
