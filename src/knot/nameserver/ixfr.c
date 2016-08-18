@@ -720,7 +720,10 @@ int ixfr_process_answer(knot_pkt_t *pkt, struct answer_data *adata)
 		if (ixfr_is_axfr(pkt)) {
 			IXFRIN_LOG(LOG_NOTICE, "receiving AXFR-style IXFR");
 			adata->response_type = KNOT_RESPONSE_AXFR;
-			return axfr_process_answer(pkt, adata);
+
+			assert(0);
+			//return axfr_process_answer(pkt, adata);
+			return KNOT_STATE_FAIL;
 		}
 
 		/* Initialize processing with first packet. */

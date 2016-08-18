@@ -47,6 +47,8 @@ typedef enum zone_flag_t {
 	ZONE_EXPIRED      = 1 << 3, /* Zone is expired. */
 } zone_flag_t;
 
+/// XXX: ^ remove expired?
+
 /*!
  * \brief Structure for holding DNS zone.
  */

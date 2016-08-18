@@ -45,6 +45,7 @@ struct answer_data {
 	/* Extensions. */
 	void *ext;
 	void (*ext_cleanup)(struct answer_data*); /*!< Extensions cleanup callback. */
+	// XXX: is it used?
 	knot_sign_context_t sign;            /*!< Signing context. */
 
 	/* Everything below should be kept on reset. */
@@ -54,6 +55,8 @@ struct answer_data {
 };
 
 int zone_query_execute(conf_t *conf, zone_t *zone, uint16_t pkt_type, const conf_remote_t *remote);
+
+void query_init_pkt(knot_pkt_t *pkt);
 
 #define ZONE_QUERY_LOG(priority, zone, remote, operation, msg, ...) \
 	NS_PROC_LOG(priority, zone->name, &(remote)->addr, operation, msg, ##__VA_ARGS__)

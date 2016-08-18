@@ -105,6 +105,16 @@ struct knot_request *knot_request_make(knot_mm_t *mm,
                                        knot_pkt_t *query,
                                        unsigned flags)
 {
+	return knot_request_make2(mm, remote, source, query, NULL, flags);
+}
+
+struct knot_request *knot_request_make2(knot_mm_t *mm,
+                                        const struct sockaddr *remote,
+                                        const struct sockaddr *source,
+                                        knot_pkt_t *query,
+                                        const knot_tsig_key_t *tsig_key,
+                                        unsigned flags)
+{
 	if (remote == NULL || query == NULL) {
 		return NULL;
 	}
@@ -131,6 +141,8 @@ struct knot_request *knot_request_make(knot_mm_t *mm,
 		request->source.ss_family = AF_UNSPEC;
 	}
 
+	tsig_init(&request->tsig, tsig_key);
+
 	return request;
 }
 
@@ -145,6 +157,7 @@ void knot_request_free(struct knot_request *request, knot_mm_t *mm)
 	}
 	knot_pkt_free(&request->query);
 	knot_pkt_free(&request->resp);
+	tsig_cleanup(&request->tsig);
 
 	mm_free(mm, request);
 }
@@ -193,9 +206,12 @@ static int request_io(struct knot_requestor *req, struct knot_request *last,
 
 	// Data to be sent
 	if (req->layer.state == KNOT_STATE_PRODUCE) {
-
-		/* Process query and send it out. */
 		knot_layer_produce(&req->layer, query);
+
+		ret = tsig_sign_packet(&last->tsig, query);
+		if (ret != KNOT_EOK) {
+			return ret;
+		}
 
 		if (req->layer.state == KNOT_STATE_CONSUME) {
 			ret = request_send(last, timeout_ms);
@@ -213,7 +229,16 @@ static int request_io(struct knot_requestor *req, struct knot_request *last,
 			return ret;
 		}
 
-		(void) knot_pkt_parse(resp, 0);
+		ret = knot_pkt_parse(resp, 0);
+		if (ret != KNOT_EOK) {
+			return ret;
+		}
+
+		ret = tsig_verify_packet(&last->tsig, resp);
+		if (ret != KNOT_EOK) {
+			return ret;
+		}
+
 		knot_layer_consume(&req->layer, resp);
 	}
 
@@ -252,6 +277,11 @@ int knot_requestor_exec(struct knot_requestor *requestor,
 
 	/* Expect complete request. */
 	if (requestor->layer.state != KNOT_STATE_DONE) {
+		ret = KNOT_LAYER_ERROR;
+	}
+
+	/* Verify last TSIG */
+	if (tsig_unsigned_count(&request->tsig) != 0) {
 		ret = KNOT_LAYER_ERROR;
 	}
 

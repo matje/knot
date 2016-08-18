@@ -19,6 +19,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 
+#include "knot/nameserver/tsig_ctx.h"
 #include "knot/query/layer.h"
 #include "libknot/mm_ctx.h"
 #include "libknot/rrtype/tsig.h"
@@ -46,6 +47,7 @@ struct knot_request {
 	struct sockaddr_storage remote, source;
 	knot_pkt_t *query;
 	knot_pkt_t *resp;
+	tsig_ctx_t tsig;
 	knot_sign_context_t sign;
 };
 
@@ -65,6 +67,13 @@ struct knot_request *knot_request_make(knot_mm_t *mm,
                                        const struct sockaddr *src,
                                        knot_pkt_t *query,
                                        unsigned flags);
+
+struct knot_request *knot_request_make2(knot_mm_t *mm,
+                                        const struct sockaddr *remote,
+                                        const struct sockaddr *source,
+                                        knot_pkt_t *query,
+                                        const knot_tsig_key_t *tsig_key,
+                                        unsigned flags);
 
 /*!
  * \brief Free request and associated data.

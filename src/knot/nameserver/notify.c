@@ -29,11 +29,6 @@
 	NS_PROC_LOG(priority, knot_pkt_qname(qdata->query), qdata->param->remote, \
 	            "NOTIFY, incoming", msg, ##__VA_ARGS__)
 
-/* NOTIFY-specific logging (internal, expects 'adata' variable set). */
-#define NOTIFY_OUT_LOG(priority, msg, ...) \
-	NS_PROC_LOG(priority, adata->param->zone->name, adata->param->remote, \
-	            "NOTIFY, outgoing", msg, ##__VA_ARGS__)
-
 static int notify_check_query(struct query_data *qdata)
 {
 	/* RFC1996 requires SOA question. */
@@ -90,25 +85,4 @@ int notify_process_query(knot_pkt_t *pkt, struct query_data *qdata)
 	zone_events_schedule(zone, ZONE_EVENT_REFRESH, ZONE_EVENT_NOW);
 
 	return KNOT_STATE_DONE;
-}
-
-int notify_process_answer(knot_pkt_t *pkt, struct answer_data *adata)
-{
-	if (pkt == NULL || adata == NULL) {
-		return KNOT_STATE_FAIL;
-	}
-
-	/* Check RCODE. */
-	uint8_t rcode = knot_wire_get_rcode(pkt->wire);
-	if (rcode != KNOT_RCODE_NOERROR) {
-		const knot_lookup_t *lut = knot_lookup_by_id(knot_rcode_names, rcode);
-		if (lut != NULL) {
-			NOTIFY_OUT_LOG(LOG_WARNING, "server responded with %s", lut->name);
-		}
-		return KNOT_STATE_FAIL;
-	}
-
-	NS_NEED_TSIG_SIGNED(&adata->param->tsig_ctx, 0);
-
-	return KNOT_STATE_DONE; /* No processing. */
 }

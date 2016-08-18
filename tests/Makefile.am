@@ -63,6 +63,9 @@ check_PROGRAMS = \
 	zonedb				\
 	ztree
 
+#check_PROGRAMS += foo
+#check_PROGRAMS += foo_dname
+
 check_PROGRAMS += \
 	modules/online_sign		\
 	utils/test_lookup

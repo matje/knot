@@ -79,11 +79,4 @@ int xfr_process_list(knot_pkt_t *pkt, xfr_put_cb put, struct query_data *qdata);
  */
 int axfr_process_query(knot_pkt_t *pkt, struct query_data *qdata);
 
-/*!
- * \brief Processes an AXFR response message.
- *
- * \return KNOT_STATE_* processing states
- */
-int axfr_process_answer(knot_pkt_t *pkt, struct answer_data *adata);
-
 /*! @} */

@@ -32,7 +32,6 @@
 #include "knot/nameserver/axfr.h"
 #include "knot/nameserver/internet.h"
 #include "knot/nameserver/ixfr.h"
-#include "knot/nameserver/notify.h"
 
 /*! \brief Accessor to query-specific data. */
 #define ANSWER_DATA(ctx) ((struct answer_data *)(ctx)->data)
@@ -143,13 +142,13 @@ static int process_answer(knot_layer_t *ctx, knot_pkt_t *pkt)
 		next_state = internet_process_answer(pkt, data);
 		break;
 	case KNOT_RESPONSE_AXFR:
-		next_state = axfr_process_answer(pkt, data);
+		// XXX:
+		assert(0);
+		next_state = KNOT_STATE_FAIL;
+//		next_state = axfr_process_answer(pkt, data);
 		break;
 	case KNOT_RESPONSE_IXFR:
 		next_state = ixfr_process_answer(pkt, data);
-		break;
-	case KNOT_RESPONSE_NOTIFY:
-		next_state = notify_process_answer(pkt, data);
 		break;
 	default:
 		next_state = KNOT_STATE_NOOP;
@@ -182,7 +181,7 @@ const knot_layer_api_t *process_answer_layer(void)
 
 
 /*! \brief Create zone query packet. */
-static knot_pkt_t *zone_query(const zone_t *zone, uint16_t pkt_type, knot_mm_t *mm)
+static knot_pkt_t *create_query(const zone_t *zone, uint16_t pkt_type, knot_mm_t *mm)
 {
 	/* Determine query type and opcode. */
 	uint16_t query_type = KNOT_RRTYPE_SOA;
@@ -306,7 +305,7 @@ int zone_query_execute(conf_t *conf, zone_t *zone, uint16_t pkt_type, const conf
 	mm_ctx_mempool(&mm, MM_DEFAULT_BLKSIZE);
 
 	/* Create a query message. */
-	knot_pkt_t *query = zone_query(zone, pkt_type, &mm);
+	knot_pkt_t *query = create_query(zone, pkt_type, &mm);
 	if (query == NULL) {
 		mp_delete(mm.ctx);
 		return KNOT_ENOMEM;
@@ -326,6 +325,107 @@ int zone_query_execute(conf_t *conf, zone_t *zone, uint16_t pkt_type, const conf
 		.conf = conf,
 		.query = query,
 		.remote = &remote->addr
+	};
+
+	const knot_tsig_key_t *key = remote->key.name != NULL ?
+	                             &remote->key : NULL;
+	tsig_init(&param.tsig_ctx, key);
+
+	ret = tsig_sign_packet(&param.tsig_ctx, query);
+	if (ret != KNOT_EOK) {
+		tsig_cleanup(&param.tsig_ctx);
+		knot_pkt_free(&query);
+		mp_delete(mm.ctx);
+		return ret;
+	}
+
+	/* Process the query. */
+	ret = zone_query_request(query, remote, &param, &mm);
+
+	/* Cleanup. */
+	tsig_cleanup(&param.tsig_ctx);
+	knot_pkt_free(&query);
+	mp_delete(mm.ctx);
+
+	return ret;
+}
+
+void query_init_pkt(knot_pkt_t *pkt)
+{
+	assert(pkt);
+
+	knot_pkt_clear(pkt);
+	knot_wire_set_id(pkt->wire, dnssec_random_uint16_t());
+}
+
+#if 0
+
+static void query_add_soa(knot_pkt_t *pkt, knot_section_t section, const zone_t *zone)
+{
+	knot_pkt_begin(pkt, section);
+	knot_rrset_t soa = node_rrset(zone->contents->apex, KNOT_RRTYPE_SOA);
+	knot_pkt_put(pkt, KNOT_COMPR_HINT_QNAME, &soa, 0);
+}
+
+static int query_create_axfr(knot_pkt_t *pkt, const zone_t *zone)
+{
+	query_create_empty(pkt);
+	knot_wire_set_opcode(pkt->wire, KNOT_OPCODE_QUERY);
+	knot_pkt_put_question(pkt, zone->name, KNOT_CLASS_IN, KNOT_RRTYPE_AXFR);
+
+	return KNOT_EOK;
+}
+
+static int query_create_ixfr(knot_pkt_t *pkt, const zone_t *zone)
+{
+	query_create_empty(pkt);
+	knot_wire_set_opcode(pkt->wire, KNOT_OPCODE_QUERY);
+	knot_pkt_put_question(pkt, zone->name, KNOT_CLASS_IN, KNOT_RRTYPE_IXFR);
+	query_add_soa(pkt, KNOT_AUTHORITY, zone);
+
+	return KNOT_EOK;
+}
+
+static int query_create_notify(knot_pkt_t *pkt, const zone_t *zone)
+{
+	query_create_empty(pkt);
+	knot_wire_set_opcode(pkt->wire, KNOT_OPCODE_NOTIFY);
+	knot_wire_set_aa(pkt->wire);
+	knot_pkt_put_question(pkt, zone->name, KNOT_CLASS_IN, KNOT_RRTYPE_SOA);
+	query_add_soa(pkt, KNOT_ANSWER, zone);
+
+	return KNOT_EOK;
+}
+
+#endif
+
+int zone_query_send_notify(conf_t *conf, zone_t *zone, const conf_remote_t *remote)
+{
+	/* Create a memory pool for this task. */
+	knot_mm_t mm;
+	mm_ctx_mempool(&mm, MM_DEFAULT_BLKSIZE);
+
+	/* Create a query message. */
+	knot_pkt_t *query = create_query(zone, KNOT_QUERY_NOTIFY, &mm);
+	if (query == NULL) {
+		mp_delete(mm.ctx);
+		return KNOT_ENOMEM;
+	}
+
+	/* Set EDNS section. */
+	int ret = prepare_edns(conf, zone, query);
+	if (ret != KNOT_EOK) {
+		knot_pkt_free(&query);
+		mp_delete(mm.ctx);
+		return ret;
+	}
+
+	/* Answer processing parameters. */
+	struct process_answer_param param = {
+		.zone = zone,
+		.conf = conf,
+		.query = query,
+		.remote = &remote->addr,
 	};
 
 	const knot_tsig_key_t *key = remote->key.name != NULL ?
