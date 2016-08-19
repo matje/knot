@@ -27,6 +27,7 @@
  */
 enum knot_layer_state {
 	KNOT_STATE_NOOP = 0,   //!< Invalid.
+	KNOT_STATE_RESET,      //!< New message exchange.
 	KNOT_STATE_CONSUME,    //!< Consume data.
 	KNOT_STATE_PRODUCE,    //!< Produce data.
 	KNOT_STATE_DONE,       //!< Finished.
