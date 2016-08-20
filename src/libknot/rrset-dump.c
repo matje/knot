@@ -1255,9 +1255,10 @@ static void wire_tsig_rcode_to_str(rrset_dump_params_t *p)
 
 	// Find RCODE name.
 	const knot_lookup_t *rcode = NULL;
-	rcode = knot_lookup_by_id((data >= ((knot_lookup_t *)knot_tsig_err_names)->id) ?
-	                          knot_tsig_err_names : knot_rcode_names,
-	                          data);
+	rcode = knot_lookup_by_id(knot_tsig_rcode_names, data);
+	if (rcode == NULL) {
+		rcode = knot_lookup_by_id(knot_rcode_names, data);
+	}
 	if (rcode != NULL) {
 		rcode_str = rcode->name;
 	}
