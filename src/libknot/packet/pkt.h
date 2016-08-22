@@ -318,9 +318,8 @@ int knot_pkt_parse_payload(knot_pkt_t *pkt, unsigned flags);
 /*!
  * \brief Get the Extended RCODE from the packet.
  *
- * Extended RCODE is created by using the Extended RCODE field from OPT RR as
- * higher 8 bits and the RCODE from DNS Header as the lower 4 bits, resulting
- * in a 12-bit unsigned integer. (See RFC 6891, Section 6.1.3).
+ * Extended RCODE is created by considering TSIG RCODE, EDNS RCODE and
+ * DNS Header RCODE. (See RFC 6895, Section 2.3).
  *
  * \param pkt Packet to get the response code from.
  *

@@ -872,7 +872,9 @@ uint16_t knot_pkt_get_ext_rcode(const knot_pkt_t *pkt)
 
 	uint8_t rcode = knot_wire_get_rcode(pkt->wire);
 
-	if (pkt->opt_rr) {
+	if (rcode == KNOT_RCODE_NOTAUTH && pkt->tsig_rr) {
+		return knot_tsig_rdata_error(pkt->tsig_rr);
+	} else if (pkt->opt_rr) {
 		uint8_t opt_rcode = knot_edns_get_ext_rcode(pkt->opt_rr);
 		return knot_edns_whole_rcode(opt_rcode, rcode);
 	} else {
