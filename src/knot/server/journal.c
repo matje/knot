@@ -468,15 +468,15 @@ int journal_write_out(journal_t *journal, journal_node_t *n)
 	return KNOT_EOK;
 }
 
-journal_t* journal_open(const char *path, size_t fslimit)
+int journal_open(journal_t *j, const char *path, size_t fslimit)
 {
 	if (path == NULL) {
-		return NULL;
+		return KNOT_EINVAL;
 	}
 
-	journal_t *j = malloc(sizeof(journal_t));
+	j = malloc(sizeof(journal_t));
 	if (j == NULL) {
-		return NULL;
+		return KNOT_ENOMEM;
 	}
 
 	memset(j, 0, sizeof(journal_t));
@@ -494,17 +494,15 @@ journal_t* journal_open(const char *path, size_t fslimit)
 	j->path = strdup(path);
 	if (j->path == NULL) {
 		free(j);
-		return NULL;
+		return KNOT_ENOMEM;
 	}
-
 	/* Open journal file. */
 	int ret = journal_open_file(j);
 	if (ret != KNOT_EOK) {
 		journal_close(j);
-		return NULL;
+		return ret;
 	}
-
-	return j;
+	return KNOT_EOK;
 }
 
 /*!
@@ -864,15 +862,15 @@ static int journal_walk(const char *fn, uint32_t from, uint32_t to,
                         journal_apply_t cb, const zone_t *zone, list_t *chgs)
 {
 	/* Open journal for reading. */
-	journal_t *journal = journal_open(fn, FSLIMIT_INF);
-	if (journal == NULL) {
-		return KNOT_ENOMEM;
+	journal_t *journal = NULL;
+	int ret = journal_open(journal, fn, FSLIMIT_INF);
+	if (journal != KNOT_EOK) {
+		return ret;
 	}
-
 	/* Read entries from starting serial until finished. */
 	uint32_t found_to = from;
 	journal_node_t *n = 0;
-	int ret = journal_fetch(journal, from, journal_key_from_cmp, &n);
+	ret = journal_fetch(journal, from, journal_key_from_cmp, &n);
 	if (ret != KNOT_EOK) {
 		goto finish;
 	}
@@ -973,11 +971,11 @@ int journal_store_changesets(list_t *src, const char *path, size_t size_limit)
 
 	/* Open journal for reading. */
 	int ret = KNOT_EOK;
-	journal_t *journal = journal_open(path, size_limit);
-	if (journal == NULL) {
-		return KNOT_ENOMEM;
+	journal_t *journal = NULL;
+	ret = journal_open(journal, path, size_limit);
+	if (journal != KNOT_EOK) {
+		return ret;
 	}
-
 	/* Begin writing to journal. */
 	changeset_t *chs = NULL;
 	WALK_LIST(chs, *src) {
@@ -998,12 +996,13 @@ int journal_store_changeset(changeset_t *change, const char *path, size_t size_l
 	}
 
 	/* Open journal for reading. */
-	journal_t *journal = journal_open(path, size_limit);
-	if (journal == NULL) {
-		return KNOT_ENOMEM;
+	journal_t *journal = NULL;
+	int ret = journal_open(journal, path, size_limit);
+	if (journal != KNOT_EOK) {
+		return ret;
 	}
 
-	int ret = changeset_pack(change, journal);
+	ret = changeset_pack(change, journal);
 
 	journal_close(journal);
 	return ret;
@@ -1024,12 +1023,11 @@ int journal_mark_synced(const char *path)
 	if (!journal_exists(path)) {
 		return KNOT_EOK;
 	}
-
-	journal_t *journal = journal_open(path, FSLIMIT_INF);
-	if (journal == NULL) {
-		return KNOT_ENOMEM;
+	journal_t *journal = NULL;
+	int ret = journal_open(journal, path, FSLIMIT_INF);
+	if (journal != KNOT_EOK) {
+		return ret;
 	}
-
 	size_t i = journal->qhead;
 	for(; i != journal->qtail; i = jnode_next(journal, i)) {
 		mark_synced(journal, journal->nodes + i);

@@ -115,7 +115,7 @@ typedef struct journal
  * \retval new journal instance if successful.
  * \retval NULL on error.
  */
-journal_t* journal_open(const char *path, size_t fslimit);
+int journal_open(journal_t *j, const char *path, size_t fslimit);
 
 /*!
  * \brief Map journal entry for read/write.

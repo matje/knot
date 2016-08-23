@@ -301,11 +301,19 @@ int main(int argc, char *argv[])
 	remove(jfilename);
 
 	/* Try to open journal with too small fsize. */
-	journal_t *journal = journal_open(jfilename, 1024);
+	journal_t *journal;
+	int ret = journal_open(&journal, jfilename, 1024);
+	if (journal != KNOT_EOK) {
+		return ret;
+	}
 	ok(journal == NULL, "journal: open too small");
 
+
 	/* Open/create new journal. */
-	journal = journal_open(jfilename, fsize);
+	ret = journal_open(&journal, jfilename, fsize);
+	if (journal != KNOT_EOK) {
+		return ret;
+	}
 	ok(journal != NULL, "journal: open journal '%s'", jfilename);
 	if (journal == NULL) {
 		goto skip_all;
@@ -316,7 +324,7 @@ int main(int argc, char *argv[])
 	uint64_t chk_key = 0;
 	char chk_buf[64] = {'\0'};
 	randstr(chk_buf, sizeof(chk_buf));
-	int ret = journal_map(journal, chk_key, &mptr, sizeof(chk_buf), false);
+	ret = journal_map(journal, chk_key, &mptr, sizeof(chk_buf), false);
 	is_int(KNOT_EOK, ret, "journal: write data (map)");
 	if (ret == KNOT_EOK) {
 		memcpy(mptr, chk_buf, sizeof(chk_buf));
@@ -335,7 +343,11 @@ int main(int argc, char *argv[])
 
 	/* Reopen log and re-read value. */
 	journal_close(journal);
-	journal = journal_open(jfilename, fsize);
+	journal_t *journal;
+	int ret = journal_open(&journal, jfilename, fsize);
+	if (journal != KNOT_EOK) {
+		return ret;
+	}
 	ok(journal != NULL, "journal: open journal '%s'", jfilename);
 
 	ret = journal_map(journal, chk_key, &mptr, sizeof(chk_buf), true);
@@ -374,7 +386,11 @@ int main(int argc, char *argv[])
 		journal_close(journal);
 		ret = journal_mark_synced(jfilename);
 		is_int(KNOT_EOK, ret, "journal: flush after fillup #%u", i);
-		journal = journal_open(jfilename, fsize);
+		journal_t *journal;
+		int ret = journal_open(&journal, jfilename, fsize);
+		if (journal != KNOT_EOK) {
+			return ret;
+		}
 		ok(journal != NULL, "journal: reopen after flush #%u", i);
 		/* Journal fillup. */
 		test_fillup(journal, fsize, i, sizes[i % num_sizes]);
