@@ -85,7 +85,7 @@ static int options_init_modern(options_t *options)
 
 	// Open confdb.
 	conf_t *new_conf = NULL;
-	if (conf_new(&new_conf, conf_scheme, options->confdb, flags) != KNOT_EOK) {
+	if (conf_new(&new_conf, conf_scheme(), options->confdb, flags) != KNOT_EOK) {
 		error("Failed to open configuration database '%s'.",
 		      (options->confdb != NULL) ? options->confdb : "");
 		return DNSSEC_EINVAL;

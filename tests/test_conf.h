@@ -24,7 +24,7 @@ static inline int test_conf(const char *conf_str, const yp_item_t *scheme)
 {
 	// Use default scheme if not specified.
 	if (scheme == NULL) {
-		scheme = conf_scheme;
+		scheme = conf_scheme();
 	}
 
 	conf_t *new_conf = NULL;

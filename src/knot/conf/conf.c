@@ -1214,3 +1214,8 @@ conf_remote_t conf_remote_txn(
 
 	return out;
 }
+
+const yp_item_t* conf_scheme(void)
+{
+	return conf_scheme_base;
+}

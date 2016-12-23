@@ -699,4 +699,6 @@ static inline conf_remote_t conf_remote(
 
 }
 
+const yp_item_t* conf_scheme(void);
+
 /*! @} */

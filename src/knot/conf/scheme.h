@@ -121,6 +121,6 @@ enum {
 
 extern const knot_lookup_t acl_actions[];
 
-extern const yp_item_t conf_scheme[];
+extern const yp_item_t conf_scheme_base[];
 
 /*! @} */

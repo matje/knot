@@ -257,7 +257,7 @@ static const yp_item_t desc_zone[] = {
 	{ NULL }
 };
 
-const yp_item_t conf_scheme[] = {
+const yp_item_t conf_scheme_base[] = {
 	{ C_SRV,      YP_TGRP, YP_VGRP = { desc_server }, CONF_IO_FRLD_SRV },
 	{ C_CTL,      YP_TGRP, YP_VGRP = { desc_control } },
 	{ C_LOG,      YP_TGRP, YP_VGRP = { desc_log }, YP_FMULTI | CONF_IO_FRLD_LOG },
