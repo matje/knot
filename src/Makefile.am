@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS = -I $(top_srcdir)/m4
-SUBDIRS = zscanner dnssec contrib/dnstap .
+SUBDIRS = zscanner dnssec contrib/dnstap . knot/modules
 
 .PHONY: check-compile
 check-compile:

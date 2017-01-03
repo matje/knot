@@ -16,6 +16,8 @@
 /Makefile.in
 /src/Makefile
 /src/Makefile.in
+/src/knot/modules/Makefile
+/src/knot/modules/Makefile.in
 /src/zscanner/Makefile
 /src/zscanner/Makefile.in
 /samples/Makefile

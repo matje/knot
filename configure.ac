@@ -532,6 +532,7 @@ AC_CONFIG_FILES([Makefile
                  tests-fuzz/Makefile
                  samples/Makefile
                  src/Makefile
+                 src/knot/modules/Makefile
                  src/contrib/dnstap/Makefile
                  src/dnssec/Makefile
                  src/dnssec/tests/Makefile
