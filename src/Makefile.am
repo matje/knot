@@ -272,18 +272,6 @@ libknotd_la_SOURCES =				\
 	knot/events/handlers/update.c		\
 	knot/events/replan.c			\
 	knot/events/replan.h			\
-	knot/modules/dnsproxy/dnsproxy.c	\
-	knot/modules/dnsproxy/dnsproxy.h	\
-	knot/modules/noudp/noudp.c		\
-	knot/modules/noudp/noudp.h		\
-	knot/modules/online_sign/online_sign.c	\
-	knot/modules/online_sign/online_sign.h	\
-	knot/modules/online_sign/nsec_next.c	\
-	knot/modules/online_sign/nsec_next.h	\
-	knot/modules/synth_record/synth_record.c\
-	knot/modules/synth_record/synth_record.h\
-	knot/modules/whoami/whoami.c		\
-	knot/modules/whoami/whoami.h		\
 	knot/nameserver/axfr.c			\
 	knot/nameserver/axfr.h			\
 	knot/nameserver/chaos.c			\
@@ -447,24 +435,6 @@ knotd_LDADD = libknotd.la libcontrib.la $(liburcu_LIBS)
 knotc_CPPFLAGS = $(AM_CPPFLAGS) $(libedit_CFLAGS)
 knotc_LDADD = libknotd.la libknotus.la $(libedit_LIBS)
 knot1to2_LDADD = libcontrib.la
-
-####################################
-# Optional Knot DNS Daemon modules #
-####################################
-
-if HAVE_DNSTAP
-libknotd_la_SOURCES +=				\
-	knot/modules/dnstap/dnstap.c		\
-	knot/modules/dnstap/dnstap.h
-libknotd_la_CPPFLAGS += $(DNSTAP_CFLAGS)
-libknotd_la_LIBADD += $(DNSTAP_LIBS) contrib/dnstap/libdnstap.la
-endif # HAVE_DNSTAP
-
-if HAVE_ROSEDB
-libknotd_la_SOURCES +=				\
-	knot/modules/rosedb/rosedb.c		\
-	knot/modules/rosedb/rosedb.h
-endif # HAVE_ROSEDB
 
 # Create storage and run-time directories
 install-data-hook:

@@ -17,31 +17,8 @@
 #include "knot/nameserver/query_module.h"
 #include "contrib/mempattern.h"
 
-#include "knot/modules/synth_record/synth_record.h"
-#include "knot/modules/dnsproxy/dnsproxy.h"
-#include "knot/modules/online_sign/online_sign.h"
-#ifdef HAVE_ROSEDB
-#include "knot/modules/rosedb/rosedb.h"
-#endif
-#if USE_DNSTAP
-#include "knot/modules/dnstap/dnstap.h"
-#endif
-#include "knot/modules/whoami/whoami.h"
-#include "knot/modules/noudp/noudp.h"
-
 /*! \note All modules should be dynamically loaded later on. */
 static_module_t MODULES[] = {
-	{ C_MOD_SYNTH_RECORD, &synth_record_load, &synth_record_unload, MOD_SCOPE_ANY },
-	{ C_MOD_DNSPROXY,     &dnsproxy_load,     &dnsproxy_unload,     MOD_SCOPE_ANY },
-	{ C_MOD_ONLINE_SIGN,  &online_sign_load,  &online_sign_unload,  MOD_SCOPE_ZONE, true },
-#ifdef HAVE_ROSEDB
-	{ C_MOD_ROSEDB,       &rosedb_load,       &rosedb_unload,       MOD_SCOPE_ANY },
-#endif
-#if USE_DNSTAP
-	{ C_MOD_DNSTAP,       &dnstap_load,       &dnstap_unload,       MOD_SCOPE_ANY },
-#endif
-	{ C_MOD_WHOAMI,       &whoami_load,       &whoami_unload,       MOD_SCOPE_ANY, true },
-	{ C_MOD_NOUDP,        &noudp_load,        &noudp_unload,        MOD_SCOPE_ANY, true },
 	{ NULL }
 };
 
