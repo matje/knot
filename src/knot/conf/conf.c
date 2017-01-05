@@ -21,6 +21,7 @@
 #include "knot/conf/base.h"
 #include "knot/conf/confdb.h"
 #include "knot/common/log.h"
+#include "knot/nameserver/query_module.h"
 #include "knot/server/dthreads.h"
 #include "libknot/libknot.h"
 #include "libknot/yparser/yptrafo.h"
@@ -29,6 +30,8 @@
 #include "contrib/string.h"
 #include "contrib/wire_ctx.h"
 #include "contrib/openbsd/strlcat.h"
+
+const yp_item_t* conf_scheme_with_modules = NULL;
 
 conf_val_t conf_get_txn(
 	conf_t *conf,
@@ -1215,7 +1218,56 @@ conf_remote_t conf_remote_txn(
 	return out;
 }
 
+static bool is_module_slot(const yp_item_t *item) {
+	return item->name[0] == C_MODULE[0] &&
+	       memcmp(item->name + 1, C_MODULE + 1, C_MODULE[0]) == 0;
+}
+
+static void load_schemes(void)
+{
+	const yp_item_t *item;
+	int n_module_schemes = query_module_count();
+
+	// Count the schemes, including modules
+	int n_schemes = 0;
+	for (item = conf_scheme_base; item->name != NULL; ++item) {
+		if (is_module_slot(item)) {
+			n_schemes += n_module_schemes;
+		} else {
+			n_schemes++;
+		}
+	}
+
+	// Allocate the expanded list
+	yp_item_t *schemes = calloc(n_schemes + 1, sizeof(yp_item_t));
+	if (schemes == NULL) {
+		log_error("Failed to load conf scheme: Out of memory");
+		return;
+	}
+
+	// Populate the list
+	yp_item_t *out = schemes;
+	for (item = conf_scheme_base; item->name != NULL; ++item) {
+		if (is_module_slot(item)) {
+			// Insert the module schemes in the prescribed slot.
+			query_module_get_conf_schemes(out);
+			out += n_module_schemes;
+		} else {
+			*(out++) = *item;
+		}
+	}
+
+	// Copy the terminating NULL scheme
+	*out = *item;
+
+	conf_scheme_with_modules = schemes;
+}
+
 const yp_item_t* conf_scheme(void)
 {
-	return conf_scheme_base;
+	if (conf_scheme_with_modules == NULL) {
+		load_schemes();
+	}
+
+	return conf_scheme_with_modules;
 }

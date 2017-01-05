@@ -140,4 +140,10 @@ struct query_module *query_module_open(conf_t *config, conf_mod_id_t *mod_id,
 /*! \brief Close query module. */
 void query_module_close(struct query_module *module);
 
+/*! \brief Get the number of modules. */
+int query_module_count(void);
+
+/*! \brief Get the module configuration schemes. */
+void query_module_get_conf_schemes(yp_item_t *out_schemes);
+
 /*! @} */

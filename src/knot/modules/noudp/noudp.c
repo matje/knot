@@ -21,6 +21,14 @@ const yp_item_t scheme_mod_noudp[] = {
 	{ NULL }
 };
 
+const static_module_t mod_info = {
+	C_MOD_NOUDP, &noudp_load, &noudp_unload, MOD_SCOPE_ANY, true
+};
+
+const yp_item_t mod_conf_scheme = {
+	C_MOD_NOUDP, YP_TGRP, YP_VGRP = { scheme_mod_noudp }, FMOD
+};
+
 static bool is_udp(struct query_data *qdata)
 {
 	return qdata->param->proc_flags & NS_QUERY_LIMIT_SIZE;

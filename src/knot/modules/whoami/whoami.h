@@ -36,4 +36,7 @@ int whoami_load(struct query_plan *plan, struct query_module *self,
                 const knot_dname_t *zone);
 int whoami_unload(struct query_module *self);
 
+extern const static_module_t mod_info;
+extern const yp_item_t       mod_conf_scheme;
+
 /*! @} */

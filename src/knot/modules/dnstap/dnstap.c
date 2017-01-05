@@ -41,6 +41,15 @@ const yp_item_t scheme_mod_dnstap[] = {
 	{ NULL }
 };
 
+const static_module_t mod_info = {
+	C_MOD_DNSTAP, &dnstap_load, &dnstap_unload, MOD_SCOPE_ANY
+};
+
+const yp_item_t mod_conf_scheme = {
+	C_MOD_DNSTAP, YP_TGRP, YP_VGRP = { scheme_mod_dnstap }, FMOD,
+	                       { check_mod_dnstap }
+};
+
 int check_mod_dnstap(conf_check_t *args)
 {
 	conf_val_t sink = conf_rawid_get_txn(args->conf, args->txn, C_MOD_DNSTAP,

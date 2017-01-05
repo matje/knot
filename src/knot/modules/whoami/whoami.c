@@ -22,6 +22,14 @@ const yp_item_t scheme_mod_whoami[] = {
 	{ NULL }
 };
 
+const static_module_t mod_info = {
+	C_MOD_WHOAMI, &whoami_load, &whoami_unload, MOD_SCOPE_ANY, true
+};
+
+const yp_item_t mod_conf_scheme = {
+	C_MOD_WHOAMI, YP_TGRP, YP_VGRP = { scheme_mod_whoami }, FMOD
+};
+
 static int whoami_query(int state, knot_pkt_t *pkt, struct query_data *qdata, void *ctx)
 {
 	knot_rrset_t *rrset = NULL;

@@ -39,4 +39,7 @@ int synth_record_load(struct query_plan *plan, struct query_module *self,
                       const knot_dname_t *zone);
 int synth_record_unload(struct query_module *self);
 
+extern const static_module_t mod_info;
+extern const yp_item_t       mod_conf_scheme;
+
 /*! @} */

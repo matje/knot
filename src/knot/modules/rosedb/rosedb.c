@@ -32,6 +32,15 @@ const yp_item_t scheme_mod_rosedb[] = {
 	{ NULL }
 };
 
+const static_module_t mod_info = {
+	C_MOD_ROSEDB, &rosedb_load, &rosedb_unload, MOD_SCOPE_ANY
+};
+
+const yp_item_t mod_conf_scheme = {
+	C_MOD_ROSEDB, YP_TGRP, YP_VGRP = { scheme_mod_rosedb }, FMOD,
+	                       { check_mod_rosedb }
+};
+
 int check_mod_rosedb(conf_check_t *args)
 {
 	conf_val_t dir = conf_rawid_get_txn(args->conf, args->txn, C_MOD_ROSEDB,

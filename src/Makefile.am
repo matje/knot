@@ -16,6 +16,7 @@ AM_CPPFLAGS = \
 	-include $(top_builddir)/src/config.h	\
 	-DCONFIG_DIR='"${config_dir}"'		\
 	-DSTORAGE_DIR='"${storage_dir}"'	\
+	-DLIB_DIR='"$(libdir)"'			\
 	-DRUN_DIR='"${run_dir}"'		\
 	-I$(srcdir)/dnssec/lib
 

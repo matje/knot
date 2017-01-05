@@ -28,6 +28,8 @@
 #include "libknot/lookup.h"
 #include "libknot/yparser/ypscheme.h"
 
+#define FMOD (YP_FMULTI | CONF_IO_FRLD_MOD | CONF_IO_FRLD_ZONES)
+
 #define C_ACL			"\x03""acl"
 #define C_ACTION		"\x06""action"
 #define C_ADDR			"\x07""address"

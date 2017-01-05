@@ -34,6 +34,15 @@ const yp_item_t scheme_mod_dnsproxy[] = {
 	{ NULL }
 };
 
+const static_module_t mod_info = {
+	C_MOD_DNSPROXY, &dnsproxy_load, &dnsproxy_unload, MOD_SCOPE_ANY
+};
+
+const yp_item_t mod_conf_scheme = {
+	C_MOD_DNSPROXY, YP_TGRP, YP_VGRP = { scheme_mod_dnsproxy }, FMOD,
+	                         { check_mod_dnsproxy }
+};
+
 int check_mod_dnsproxy(conf_check_t *args)
 {
 	conf_val_t rmt = conf_rawid_get_txn(args->conf, args->txn, C_MOD_DNSPROXY,

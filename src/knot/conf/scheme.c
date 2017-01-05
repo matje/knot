@@ -32,8 +32,6 @@
 #define HOURS(x)	((x) * 3600)
 #define DAYS(x)		((x) * HOURS(24))
 
-#define FMOD		(YP_FMULTI | CONF_IO_FRLD_MOD | CONF_IO_FRLD_ZONES)
-
 static const knot_lookup_t keystore_backends[] = {
 	{ KEYSTORE_BACKEND_PEM,    "pem" },
 	{ KEYSTORE_BACKEND_PKCS11, "pkcs11" },
@@ -254,6 +252,7 @@ const yp_item_t conf_scheme_base[] = {
 	{ C_KEY,      YP_TGRP, YP_VGRP = { desc_key }, YP_FMULTI, { check_key } },
 	{ C_ACL,      YP_TGRP, YP_VGRP = { desc_acl }, YP_FMULTI, { check_acl } },
 	{ C_RMT,      YP_TGRP, YP_VGRP = { desc_remote }, YP_FMULTI, { check_remote } },
+	{ C_MODULE },  // The module schemes will be inserted here
 	{ C_TPL,  YP_TGRP, YP_VGRP = { desc_template }, YP_FMULTI, { check_template } },
 	{ C_ZONE, YP_TGRP, YP_VGRP = { desc_zone }, YP_FMULTI | CONF_IO_FZONE, { check_zone } },
 	{ C_INCL, YP_TSTR, YP_VNONE, CONF_IO_FDIFF_ZONES | CONF_IO_FRLD_ALL, { include_file } },

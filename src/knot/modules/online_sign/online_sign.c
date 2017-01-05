@@ -71,6 +71,14 @@ const yp_item_t scheme_mod_online_sign[] = {
 	{ NULL }
 };
 
+const static_module_t mod_info = {
+	C_MOD_ONLINE_SIGN, &online_sign_load, &online_sign_unload, MOD_SCOPE_ZONE, true
+};
+
+const yp_item_t mod_conf_scheme = {
+	C_MOD_ONLINE_SIGN, YP_TGRP, YP_VGRP = { scheme_mod_online_sign }, FMOD
+};
+
 struct online_sign_ctx {
 	dnssec_key_t *key;
 };

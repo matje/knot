@@ -61,6 +61,15 @@ const yp_item_t scheme_mod_synth_record[] = {
 	{ NULL }
 };
 
+const static_module_t mod_info = {
+	C_MOD_SYNTH_RECORD, &synth_record_load, &synth_record_unload, MOD_SCOPE_ANY
+};
+
+const yp_item_t mod_conf_scheme = {
+	C_MOD_SYNTH_RECORD, YP_TGRP, YP_VGRP = { scheme_mod_synth_record }, FMOD,
+	                             { check_mod_synth_record }
+};
+
 int check_mod_synth_record(conf_check_t *args)
 {
 	// Check type.
